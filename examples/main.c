@@ -1,4 +1,4 @@
-#include <include/cdefmt.h>
+#include <cdefmt/include/cdefmt.h>
 
 int main(int argc, char *cargv[]) {
   CDEFMT_INFO("HELLO\n");
