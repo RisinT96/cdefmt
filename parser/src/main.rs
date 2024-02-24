@@ -1,11 +1,11 @@
 //! A simple example of parsing `.debug_info`.
 mod log;
 
-use log::{Log, LogParser};
+use log::LogParser;
 
 use gimli::{DW_AT_name, DW_TAG_compile_unit};
 use object::{Object, ObjectSection};
-use std::{borrow, env, fs, io::Read};
+use std::{borrow, env, fs};
 
 fn main() -> serde_json::Result<()> {
     for path in env::args().skip(1) {
@@ -30,7 +30,7 @@ fn main() -> serde_json::Result<()> {
 
             let log_id = buff.trim();
             println!("Parsing: [{}]", log_id);
-            let log_id = usize::from_str_radix(&log_id, 10).unwrap();
+            let log_id = log_id.parse().unwrap();
 
             let log = logger.get_log(log_id);
             println!("Log: {:?}", log);

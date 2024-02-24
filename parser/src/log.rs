@@ -1,9 +1,8 @@
-use std::{collections::HashMap, io::BufRead, ops::Range, usize};
+use std::collections::HashMap;
 
-use object::{File, Object, ObjectSection, ReadRef};
+use object::{File, Object, ObjectSection};
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
-use thiserror;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error<'str> {
@@ -14,9 +13,9 @@ pub enum Error<'str> {
     #[error("Provided log id [{0}] is larger than the '.cdefmt' section [{1}]")]
     OutOfBounds(usize, usize),
     #[error("The log at id [{0}] is malformed, error: {1}")]
-    Utf8Error(usize, std::str::Utf8Error),
+    Utf8(usize, std::str::Utf8Error),
     #[error("The log [{0}] is malformed: {1}")]
-    JsonError(&'str str, serde_json::Error),
+    Json(&'str str, serde_json::Error),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize_repr)]
@@ -67,8 +66,8 @@ impl<'file> LogParser<'file> {
             .split(|b| *b == 0)
             .next()
             .ok_or(Error::MissingSection)?;
-        let log = std::str::from_utf8(log).map_err(|e| Error::Utf8Error(log_id, e))?;
-        let log = serde_json::from_str(log).map_err(|e| Error::JsonError(log, e))?;
+        let log = std::str::from_utf8(log).map_err(|e| Error::Utf8(log_id, e))?;
+        let log = serde_json::from_str(log).map_err(|e| Error::Json(log, e))?;
         self.cache.insert(log_id, log);
 
         Ok(log)
