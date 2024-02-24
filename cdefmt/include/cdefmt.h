@@ -25,6 +25,9 @@ enum cdefmt_level {
 #define CDEFMT_VERBOSE(...) \
   __CDEFMT_LOG(CDEFMT_LEVEL_VERBOSE, CDEFMT_LEVEL_STR_VRB, __VA_ARGS__)
 
+/* Implement me */
+void cdefmt_log(const void* log, size_t size, int level);
+
 /* Inner mechanisms */
 
 #define CDEFMT_LEVEL_STR_ERR "E"
@@ -43,7 +46,7 @@ enum cdefmt_level {
                      _58, _59, _60, _61, _62, _63, N, ...)                   \
   N
 
-/* Returns a sequence of 64 numbers, counting down from 63 */
+/* Returns a sequence of 64 numbers, counting down from 63 to 0 */
 #define CDEFMT_RSEQ_N()                                                       \
   63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, \
       44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, \
@@ -57,8 +60,8 @@ enum cdefmt_level {
 /* Concatenates arguments into a single literal */
 #define CDEFMT_CONCAT(a_, b_) a_##b_
 
-#define CDEFMT_STRINGIFY(a_)   __CDEFMT_STRINGIFY(a_)
-#define __CDEFMT_STRINGIFY(a_) #a_
+#define CDEFMT_STRINGIFY(a_)            __CDEFMT_STRINGIFY_INDIRECT(a_)
+#define __CDEFMT_STRINGIFY_INDIRECT(a_) #a_
 
 /* Allows overloading functions depending on amount of arguments, limited to at
  * least one argument */
@@ -67,49 +70,231 @@ enum cdefmt_level {
 #define __CDEFMT_OVERLOAD_INDIRECT(func_name_, nargs_) \
   CDEFMT_CONCAT(func_name_, nargs_)
 
+#define CDEFMT_LOG_STRING(counter_) CDEFMT_CONCAT(cdefmt_log_string, counter_)
+#define CDEFMT_LOG_ARGS_T(counter_) CDEFMT_CONCAT(cdefmt_log_args_t, counter_)
+#define CDEFMT_LOG_ARGS(counter_)   CDEFMT_CONCAT(cdefmt_log_args, counter_)
+
 /* Expands into a call to the correct log macro, the first argument of the
  * __VA_ARGS__ is the message (as it's required), this is done to overcome the
  * limitation of having at least one argument */
-#define __CDEFMT_LOG(level_, level_str_, ...)                              \
-  CDEFMT_OVERLOAD(__CDEFMT_LOG, __VA_ARGS__)                               \
-  (__COUNTER__, level_,                                                    \
-   "counter: [%u], level: [%u]" CDEFMT_SEPARATOR __FILE__ CDEFMT_SEPARATOR \
-       CDEFMT_STRINGIFY(__LINE__)                                          \
-           CDEFMT_SEPARATOR level_str_ CDEFMT_SEPARATOR __VA_ARGS__)
+#define __CDEFMT_LOG(level_, level_str_, ...)                            \
+  CDEFMT_OVERLOAD(__CDEFMT_LOG, __VA_ARGS__)                             \
+  (__COUNTER__, level_,                                                  \
+   CDEFMT_SEPARATOR __FILE__ CDEFMT_SEPARATOR CDEFMT_STRINGIFY(__LINE__) \
+       CDEFMT_SEPARATOR level_str_ CDEFMT_SEPARATOR __VA_ARGS__)
 
-#define __CDEFMT_LOG1(counter_, level_, message_) \
-  printf(message_, counter_, level_)
+/* Log with 0 arguments */
+#define __CDEFMT_LOG1(counter_, level_, message_)                             \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
-#define __CDEFMT_LOG2(counter_, level_, message_, arg1_) \
-  printf(message_, counter_, level_, arg1_)
+/* Log with 1 argument */
+#define __CDEFMT_LOG2(counter_, level_, message_, arg1_)                      \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
-#define __CDEFMT_LOG3(counter_, level_, message_, arg1_, arg2_) \
-  printf(message_, counter_, level_, arg1_, arg2_)
+/* Log with 2 arguments */
+#define __CDEFMT_LOG3(counter_, level_, message_, arg1_, arg2_)               \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
-#define __CDEFMT_LOG4(counter_, level_, message_, arg1_, arg2_, arg3_) \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_)
+#define __CDEFMT_LOG4(counter_, level_, message_, arg1_, arg2_, arg3_)        \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
 #define __CDEFMT_LOG5(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_) \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_, arg4_)
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+      const __typeof__(arg4_) arg4;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+        .arg4 = arg4_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
 #define __CDEFMT_LOG6(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_)                                                  \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_, arg4_, arg5_)
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+      const __typeof__(arg4_) arg4;                                           \
+      const __typeof__(arg5_) arg5;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+        .arg4 = arg4_,                                                        \
+        .arg5 = arg5_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
 #define __CDEFMT_LOG7(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_, arg6_)                                           \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_, arg4_, arg5_, arg6_)
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+      const __typeof__(arg4_) arg4;                                           \
+      const __typeof__(arg5_) arg5;                                           \
+      const __typeof__(arg6_) arg6;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+        .arg4 = arg4_,                                                        \
+        .arg5 = arg5_,                                                        \
+        .arg6 = arg6_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
-#define __CDEFMT_LOG8(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_,  \
-                      arg5_, arg6_, arg7_)                                     \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_, arg4_, arg5_, arg6_, \
-         arg7_)
+#define __CDEFMT_LOG8(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
+                      arg5_, arg6_, arg7_)                                    \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+      const __typeof__(arg4_) arg4;                                           \
+      const __typeof__(arg5_) arg5;                                           \
+      const __typeof__(arg6_) arg6;                                           \
+      const __typeof__(arg7_) arg7;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+        .arg4 = arg4_,                                                        \
+        .arg5 = arg5_,                                                        \
+        .arg6 = arg6_,                                                        \
+        .arg7 = arg7_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
-#define __CDEFMT_LOG9(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_,  \
-                      arg5_, arg6_, arg7_, arg8_)                              \
-  printf(message_, counter_, level_, arg1_, arg2_, arg3_, arg4_, arg5_, arg6_, \
-         arg7_, arg8_)
-
-void cdefmt_log(void* log, size_t log_size, int level);
+#define __CDEFMT_LOG9(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
+                      arg5_, arg6_, arg7_, arg8_)                             \
+  do {                                                                        \
+    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
+      const char* message;                                                    \
+      const __typeof__(arg1_) arg1;                                           \
+      const __typeof__(arg2_) arg2;                                           \
+      const __typeof__(arg3_) arg3;                                           \
+      const __typeof__(arg4_) arg4;                                           \
+      const __typeof__(arg5_) arg5;                                           \
+      const __typeof__(arg6_) arg6;                                           \
+      const __typeof__(arg7_) arg7;                                           \
+      const __typeof__(arg8_) arg8;                                           \
+    };                                                                        \
+                                                                              \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {          \
+        .message = CDEFMT_LOG_STRING(counter_),                               \
+        .arg1 = arg1_,                                                        \
+        .arg2 = arg2_,                                                        \
+        .arg3 = arg3_,                                                        \
+        .arg4 = arg4_,                                                        \
+        .arg5 = arg5_,                                                        \
+        .arg6 = arg6_,                                                        \
+        .arg7 = arg7_,                                                        \
+        .arg8 = arg8_,                                                        \
+    };                                                                        \
+                                                                              \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), \
+               level_);                                                       \
+  } while (0)
 
 #endif /* CDEFMT_H */
