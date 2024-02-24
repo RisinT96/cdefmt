@@ -25,7 +25,7 @@ enum cdefmt_level {
   __CDEFMT_LOG(CDEFMT_LEVEL_VERBOSE, CDEFMT_LEVEL_STR_VRB, __VA_ARGS__)
 
 /* Implement me */
-void cdefmt_log(const void* log, size_t size, int level);
+void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* Inner mechanisms */
 

@@ -17,7 +17,7 @@ int main(int argc, char* cargv[]) {
   CDEFMT_ERROR("WHAT %u %u %u %u %u %u %u %u %u %u\n", 1, 2, 3, 4, 5, 6, 7, 8);
 }
 
-void cdefmt_log(const void* log, size_t size, int level) {
+void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
   printf("level: %u, id: %#010lx, size: %-3zu data: [", level,
          ((const uintptr_t*)log)[0], size);
 
