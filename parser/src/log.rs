@@ -16,6 +16,8 @@ pub enum Error<'str> {
     Utf8(usize, std::str::Utf8Error),
     #[error("The log [{0}] is malformed: {1}")]
     Json(&'str str, serde_json::Error),
+    #[error("Nullterminator is missing from log string")]
+    NoNullTerm,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize_repr)]
@@ -65,7 +67,7 @@ impl<'file> LogParser<'file> {
         let log = &self.data[log_id..]
             .split(|b| *b == 0)
             .next()
-            .ok_or(Error::MissingSection)?;
+            .ok_or(Error::NoNullTerm)?;
         let log = std::str::from_utf8(log).map_err(|e| Error::Utf8(log_id, e))?;
         let log = serde_json::from_str(log).map_err(|e| Error::Json(log, e))?;
         self.cache.insert(log_id, log);
