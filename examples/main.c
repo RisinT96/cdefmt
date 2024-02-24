@@ -4,8 +4,13 @@
 #include "cdefmt/include/cdefmt.h"
 
 int main(int argc, char* cargv[]) {
+  CDEFMT_ERROR("hello!");
   CDEFMT_ERROR("WHAT {}", 123);
   CDEFMT_ERROR("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
+  CDEFMT_WARNING("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
+  CDEFMT_INFO("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
+  CDEFMT_DEBUG("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
+  CDEFMT_VERBOSE("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
 }
 
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
