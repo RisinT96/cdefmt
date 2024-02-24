@@ -2,7 +2,6 @@
 #define CDEFMT_H
 
 #include <stddef.h>
-#include <stdio.h>
 
 /* User API */
 
@@ -86,7 +85,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 /* Log with 0 arguments */
 #define __CDEFMT_LOG1(counter_, level_, message_)                             \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
     };                                                                        \
@@ -102,7 +102,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 /* Log with 1 argument */
 #define __CDEFMT_LOG2(counter_, level_, message_, arg1_)                      \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -120,7 +121,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 /* Log with 2 arguments */
 #define __CDEFMT_LOG3(counter_, level_, message_, arg1_, arg2_)               \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -139,7 +141,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 
 #define __CDEFMT_LOG4(counter_, level_, message_, arg1_, arg2_, arg3_)        \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -160,7 +163,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 
 #define __CDEFMT_LOG5(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_) \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -184,7 +188,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 #define __CDEFMT_LOG6(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_)                                                  \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -210,7 +215,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 #define __CDEFMT_LOG7(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_, arg6_)                                           \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -238,7 +244,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 #define __CDEFMT_LOG8(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_, arg6_, arg7_)                                    \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \
@@ -268,7 +275,8 @@ void cdefmt_log(const void* log, size_t size, int level);
 #define __CDEFMT_LOG9(counter_, level_, message_, arg1_, arg2_, arg3_, arg4_, \
                       arg5_, arg6_, arg7_, arg8_)                             \
   do {                                                                        \
-    const static char CDEFMT_LOG_STRING(counter_)[] = message_;               \
+    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(  \
+        counter_)[] = message_;                                               \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {              \
       const char* message;                                                    \
       const __typeof__(arg1_) arg1;                                           \

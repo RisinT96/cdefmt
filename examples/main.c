@@ -1,5 +1,7 @@
-#include <cdefmt/include/cdefmt.h>
+#include <stdint.h>
 #include <stdio.h>
+
+#include "cdefmt/include/cdefmt.h"
 
 int main(int argc, char* cargv[]) {
   CDEFMT_INFO("HELLO\n");
@@ -16,5 +18,16 @@ int main(int argc, char* cargv[]) {
 }
 
 void cdefmt_log(const void* log, size_t size, int level) {
-  printf("[%u] %p:%zu, log_id: %p\n", level, log, size, ((const char**)log)[0]);
+  printf("level: %u, id: %#010lx, size: %-3zu data: [", level,
+         ((const uintptr_t*)log)[0], size);
+
+  for (size_t i = 0; i < size; i++) {
+    printf("%02x", ((const uint8_t*)log)[i]);
+
+    if (i + 1 < size) {
+      printf(", ");
+    }
+  }
+
+  printf("]\n");
 }
