@@ -1,11 +1,11 @@
 //! A simple example of parsing `.debug_info`.
 mod log;
 
-use log::Log;
+use log::{Log, LogParser};
 
 use gimli::{DW_AT_name, DW_TAG_compile_unit};
 use object::{Object, ObjectSection};
-use std::{borrow, env, fs};
+use std::{borrow, env, fs, io::Read};
 
 fn main() -> serde_json::Result<()> {
     for path in env::args().skip(1) {
@@ -17,21 +17,25 @@ fn main() -> serde_json::Result<()> {
         } else {
             gimli::RunTimeEndian::Big
         };
-        dump_file(&object, endian).unwrap();
 
-        let logs = object.section_by_name(".cdefmt").unwrap().data().unwrap();
+        let mut logger = LogParser::new(&object).unwrap();
 
-        for log in logs.split(|b| *b == 0) {
-            let log = std::str::from_utf8(log).unwrap();
+        let stdin = std::io::stdin();
+        let mut buff = Default::default();
 
-            if log.is_empty() {
-                continue;
+        while let Ok(s) = stdin.read_line(&mut buff) {
+            if s == 0 {
+                break;
             }
 
-            println!("Parsing: {}", log);
-            let log :Log= serde_json::from_str(log)?;
+            let log_id = buff.trim();
+            println!("Parsing: [{}]", log_id);
+            let log_id = usize::from_str_radix(&log_id, 10).unwrap();
 
-            println!("{:#?}", log);
+            let log = logger.get_log(log_id);
+            println!("Log: {:?}", log);
+
+            buff.clear();
         }
     }
 
