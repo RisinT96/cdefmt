@@ -2,5 +2,5 @@
 resolver = "2"
 
 members = [
-    "cdefmt-parser",
+    "cdefmt-parser", "examples/stdin"
 ]
