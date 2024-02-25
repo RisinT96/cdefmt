@@ -1,12 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 include(FetchContent)
 
-project("cdefmt"
-    LANGUAGES C
-)
-
-add_library(cdefmt INTERFACE)
-target_include_directories(cdefmt INTERFACE .)
+project("cdefmt")
 
 FetchContent_Declare(
     Corrosion
@@ -15,7 +10,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-corrosion_import_crate(MANIFEST_PATH parser/Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH rust/Cargo.toml)
 
-add_subdirectory("examples")
+add_subdirectory("c")
 
