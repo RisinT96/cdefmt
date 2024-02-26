@@ -1,0 +1,6 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "rust/cdefmt-parser", "rust/examples/stdin"
+]

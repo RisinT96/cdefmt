@@ -22,7 +22,7 @@ fn main() -> std::result::Result<(), String> {
         let log_id = buff.trim().parse::<usize>().map_err(|e| e.to_string())?;
 
         let log = logger.get_log(log_id).map_err(|e| e.to_string())?;
-        println!("[{}] {:?}", log_id, log);
+        println!("[{:#010x}] {:?}", log_id, log);
 
         buff.clear();
     }

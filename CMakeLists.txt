@@ -10,7 +10,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-corrosion_import_crate(MANIFEST_PATH rust/Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH Cargo.toml)
 
 add_subdirectory("c")
 

@@ -24,6 +24,5 @@ add_custom_command(
     OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/generate_linkerscript.sh
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/generate_linkerscript.sh ${CMAKE_LINKER} ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
-    COMMENT Generates linkerscript with custom sections
+    COMMENT "Generating custom linkerscript"
 )
-
