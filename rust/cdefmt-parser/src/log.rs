@@ -1,6 +1,11 @@
+//! Log related logic.
+//!
+//! The logic contained within this file relates to using a log id to extract and parse the log's
+//! information from the elf.
+
 use std::collections::HashMap;
 
-use object::{File, Object, ObjectSection};
+use object::{Object, ObjectSection, ReadRef};
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
@@ -39,13 +44,14 @@ pub struct Log<'str> {
     message: &'str str,
 }
 
-pub struct LogParser<'file> {
-    cache: HashMap<usize, Log<'file>>,
-    data: &'file [u8],
+pub struct LogParser<'data> {
+    cache: HashMap<usize, Log<'data>>,
+    data: &'data [u8],
 }
 
-impl<'file> LogParser<'file> {
-    pub fn new(file: &'file File<'file>) -> Result<LogParser<'file>, Error> {
+impl<'data> LogParser<'data> {
+    pub fn new<R: ReadRef<'data>>(data: R) -> Result<LogParser<'data>, Error<'static>> {
+        let file = object::File::parse(data)?;
         Ok(LogParser {
             cache: Default::default(),
             data: file
