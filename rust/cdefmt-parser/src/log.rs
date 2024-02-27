@@ -9,21 +9,7 @@ use object::{Object, ObjectSection, ReadRef};
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error<'str> {
-    #[error("The provided elf is missing the '.cdefmt' section.")]
-    MissingSection,
-    #[error("Failed extract data from the '.cdefmt' section, error: {0}")]
-    SectionData(#[from] object::Error),
-    #[error("Provided log id [{0}] is larger than the '.cdefmt' section [{1}]")]
-    OutOfBounds(usize, usize),
-    #[error("The log at id [{0}] is malformed, error: {1}")]
-    Utf8(usize, std::str::Utf8Error),
-    #[error("The log [{0}] is malformed: {1}")]
-    Json(&'str str, serde_json::Error),
-    #[error("Nullterminator is missing from log string")]
-    NoNullTerm,
-}
+use crate::{dwarf::UncompressedDwarf, Error, Result};
 
 #[derive(Clone, Copy, Debug, Deserialize_repr)]
 #[repr(u8)]
@@ -47,21 +33,24 @@ pub struct Log<'str> {
 pub struct LogParser<'data> {
     cache: HashMap<usize, Log<'data>>,
     data: &'data [u8],
+    dwarf: UncompressedDwarf<'data>,
 }
 
 impl<'data> LogParser<'data> {
-    pub fn new<R: ReadRef<'data>>(data: R) -> Result<LogParser<'data>, Error<'static>> {
+    pub fn new<R: ReadRef<'data>>(data: R) -> Result<Self> {
         let file = object::File::parse(data)?;
+        let dwarf = UncompressedDwarf::new(data)?;
         Ok(LogParser {
             cache: Default::default(),
             data: file
                 .section_by_name(".cdefmt")
                 .ok_or(Error::MissingSection)?
                 .data()?,
+            dwarf,
         })
     }
 
-    pub fn get_log(&mut self, log_id: usize) -> Result<Log, Error> {
+    pub fn get_log(&mut self, log_id: usize) -> Result<Log> {
         if log_id >= self.data.len() {
             return Err(Error::OutOfBounds(log_id, self.data.len()));
         }
@@ -75,8 +64,14 @@ impl<'data> LogParser<'data> {
             .next()
             .ok_or(Error::NoNullTerm)?;
         let log = std::str::from_utf8(log).map_err(|e| Error::Utf8(log_id, e))?;
-        let log = serde_json::from_str(log).map_err(|e| Error::Json(log, e))?;
+        let log = serde_json::from_str(log)?;
         self.cache.insert(log_id, log);
+
+        let dwarf = self.dwarf.borrow();
+        let unit = crate::dwarf::find_compilation_unit(&dwarf, log.file)?;
+
+        let type_name = format!("cdefmt_log_args_t{}", log.counter);
+        let r#type = crate::dwarf::find_type(&dwarf, &unit, &type_name)?;
 
         Ok(log)
     }
