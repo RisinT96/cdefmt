@@ -1,5 +1,8 @@
+use gimli::{DwAte, DwTag, SectionId};
+
 pub mod dwarf;
 pub mod log;
+pub mod r#type;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -15,6 +18,8 @@ pub enum Error {
     NoCompilationUnit(String),
     #[error("Nullterminator is missing from log string")]
     NoNullTerm,
+    #[error("The elf is missing the following section: {0:?}")]
+    NoSection(SectionId),
     #[error("Unable to find requested type ({0}).")]
     NoType(String),
     #[error("Provided log id [{0}] is larger than the '.cdefmt' section [{1}]")]
@@ -23,6 +28,10 @@ pub enum Error {
     SectionData(#[from] object::Error),
     #[error("The log at id [{0}] is malformed, error: {1}")]
     Utf8(usize, std::str::Utf8Error),
+    #[error("Encountered an unsuppodted base type, encoding: {0}, size: {1}")]
+    UnsupportedBaseType(DwAte, u64),
+    #[error("Encountered an unexpected tag: {0}")]
+    UnexpectedTag(DwTag),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,17 +1,32 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
 #include "cdefmt/include/cdefmt.h"
 
+struct some_struct {
+  uint32_t a;
+  uint16_t b;
+  uint64_t c;
+};
+
 int main(int argc, char* cargv[]) {
-  CDEFMT_ERROR("hello!");
-  CDEFMT_ERROR("WHAT {}", 123);
-  CDEFMT_ERROR("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
-  CDEFMT_WARNING("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
-  CDEFMT_INFO("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
-  CDEFMT_DEBUG("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
-  CDEFMT_VERBOSE("WHAT {0} {1} {2} {3} {4} {5} {6} {7}", 1, 2, 3, 4, 5, 6, 7, 8);
+  uint32_t a = 5;
+  struct some_struct b = {
+      .a = 123,
+      .b = 543,
+      .c = 9123,
+  };
+  bool c = false;
+
+  CDEFMT_ERROR("WHAT?! {}", a);
+  CDEFMT_WARNING("WHAT?! {}", 123);
+  CDEFMT_INFO("WHAT?! {}", true);
+  CDEFMT_DEBUG("WHAT?! {}", c, 123);
+  CDEFMT_VERBOSE("I love spam! {}", b);
+
+  return 0;
 }
 
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {

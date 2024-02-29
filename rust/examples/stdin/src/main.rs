@@ -20,15 +20,12 @@ fn main() -> std::result::Result<(), String> {
 
         let log_id = buff.trim().parse::<usize>().map_err(|e| e.to_string())?;
 
-        let log = logger.get_log(log_id).map_err(|e| e.to_string())?;
-        println!("[{:#010x}] {:?}", log_id, log);
-
+        let log = logger.get_log(log_id);
+        match log {
+            Ok(log) => println!("Log: [{:#010x}] {:?}", log_id, log),
+            Err(e) => println!("Err: [{:#010x}] {}", log_id, e),
+        }
         buff.clear();
     }
-
-    let file = object::File::parse(&*mmap).unwrap();
-
-    cdefmt_parser::dwarf::dump_file(&file).unwrap();
-
     Ok(())
 }
