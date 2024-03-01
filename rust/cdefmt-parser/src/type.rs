@@ -11,12 +11,16 @@ pub enum Type {
     I64,
     F32,
     F64,
-    Structure{name: String, members: Vec<StructureMember>},
+    Structure {
+        name: String,
+        members: Vec<StructureMember>,
+    },
     Pointer(Box<Type>),
 }
 
 #[derive(Debug, Clone)]
 pub struct StructureMember {
+    pub offset: u64,
     pub name: String,
     pub ty: Type,
 }

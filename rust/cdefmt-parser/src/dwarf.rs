@@ -192,11 +192,17 @@ impl<'data> UncompressedDwarf<'data> {
 
                 println!("Parsing member: {}", name);
 
-                let ty = get_attribute!(entry, gimli::DW_AT_type);
+                let offset = entry
+                    .attr_value(gimli::DW_AT_data_member_location)?
+                    .map(|o| o.udata_value())
+                    .flatten()
+                    .unwrap_or(0);
 
-                if let AttributeValue::UnitRef(unit_offset) = ty {
+                if let AttributeValue::UnitRef(unit_offset) = get_attribute!(entry, gimli::DW_AT_type) {
                     let ty = Self::parse_type(dwarf, unit, unit_offset)?;
-                    members.push(StructureMember { name, ty });
+                    members.push(StructureMember { name, ty, offset });
+                } else {
+                    return Err(Error::BadAttribute);
                 }
 
                 entry = if let Some(e) = entries.next_sibling()? {

@@ -34,6 +34,8 @@ pub enum Error {
     UnsupportedPointerSize(u64),
     #[error("Encountered an unexpected tag: {0}")]
     UnexpectedTag(DwTag),
+    #[error("Encountered attribute with bad value.")]
+    BadAttribute,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
