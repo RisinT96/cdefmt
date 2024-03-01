@@ -36,6 +36,8 @@ pub enum Error {
     UnexpectedTag(DwTag),
     #[error("Encountered attribute with bad value.")]
     BadAttribute,
+    #[error("{0}")]
+    Custom(&'static str),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

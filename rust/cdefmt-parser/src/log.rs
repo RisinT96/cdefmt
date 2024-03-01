@@ -29,7 +29,6 @@ pub struct Log<'str> {
     file: &'str str,
     line: usize,
     message: &'str str,
-
 }
 
 pub struct LogParser<'data> {
@@ -74,7 +73,10 @@ impl<'data> LogParser<'data> {
         let type_name = format!("cdefmt_log_args_t{}", log.counter);
 
         let res = self.dwarf.get_type(log.file, &type_name);
-        println!("{:?}", res);
+        match res {
+            Ok(ty) => println!("Type: {ty:#?}"),
+            Err(e) => println!("Err : {e}"),
+        }
 
         Ok(log)
     }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 #[derive(Debug, Clone)]
 pub enum Type {
     Bool,
@@ -11,6 +13,11 @@ pub enum Type {
     I64,
     F32,
     F64,
+    Enumeration {
+        ty: Box<Type>,
+        /// Use i128 to deal with u64 and i64 enums.
+        valid_values: BTreeMap<i128, String>,
+    },
     Structure {
         name: String,
         members: Vec<StructureMember>,
