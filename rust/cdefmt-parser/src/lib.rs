@@ -28,8 +28,10 @@ pub enum Error {
     SectionData(#[from] object::Error),
     #[error("The log at id [{0}] is malformed, error: {1}")]
     Utf8(usize, std::str::Utf8Error),
-    #[error("Encountered an unsuppodted base type, encoding: {0}, size: {1}")]
+    #[error("Encountered an unsupported base type, encoding: {0}, size: {1}")]
     UnsupportedBaseType(DwAte, u64),
+    #[error("Encountered an unsupported pointer size: {0}")]
+    UnsupportedPointerSize(u64),
     #[error("Encountered an unexpected tag: {0}")]
     UnexpectedTag(DwTag),
 }

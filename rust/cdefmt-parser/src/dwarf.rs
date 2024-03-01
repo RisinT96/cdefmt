@@ -246,7 +246,13 @@ impl<'data> UncompressedDwarf<'data> {
         let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
 
         if let AttributeValue::Udata(byte_size) = byte_size {
-            Ok(Type::Pointer(byte_size))
+            Ok(Type::Pointer(Box::new(match byte_size {
+                1 => Type::U8,
+                2 => Type::U16,
+                4 => Type::U32,
+                8 => Type::U64,
+                _ => return Err(Error::UnsupportedPointerSize(byte_size)),
+            })))
         } else {
             Err(Error::NoNullTerm)
         }

@@ -12,7 +12,7 @@ pub enum Type {
     F32,
     F64,
     Structure{name: String, members: Vec<StructureMember>},
-    Pointer(u64),
+    Pointer(Box<Type>),
 }
 
 #[derive(Debug, Clone)]
