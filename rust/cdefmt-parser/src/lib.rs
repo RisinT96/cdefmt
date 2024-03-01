@@ -3,6 +3,7 @@ use gimli::{DwAte, DwTag, SectionId};
 pub mod dwarf;
 pub mod log;
 pub mod r#type;
+pub mod var;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

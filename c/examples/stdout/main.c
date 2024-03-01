@@ -53,8 +53,16 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
   fstat(1, &stat);
 
   if (S_ISFIFO(stat.st_mode)) {
-    // For piping, we output the log IDs.
-    printf("%lu\n", ((const uintptr_t*)log)[0]);
+    // When piping, write the data as hex
+    for (size_t i = 0; i < size; i++) {
+      printf("%02x", ((const uint8_t*)log)[i]);
+
+      if (i + 1 < size) {
+        printf(";");
+      }
+    }
+
+    printf("\n");
     return;
   }
 

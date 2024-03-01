@@ -18,14 +18,18 @@ fn main() -> std::result::Result<(), String> {
             break;
         }
 
-        let log_id = buff.trim().parse::<usize>().map_err(|e| e.to_string())?;
-
-        let log = logger.get_log(log_id);
+        let parsed_buff = buff
+            .trim()
+            .split(";")
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+            .collect::<Vec<_>>();
+        let log = logger.parse_log(&parsed_buff);
         match log {
-            Ok(log) => println!("Log: [{:#010x}] {:?}", log_id, log),
-            Err(e) => println!("Err: [{:#010x}] {}", log_id, e),
+            Ok(log) => println!("Log: {:#?}", log),
+            Err(e) => println!("Err: {}", e),
         }
-        buff.clear();
+
+        buff.clear()
     }
     Ok(())
 }

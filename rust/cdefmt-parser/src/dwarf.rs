@@ -19,7 +19,7 @@ macro_rules! get_attribute {
 #[derive(Debug)]
 pub(crate) struct UncompressedDwarf<'data> {
     dwarf: Dwarf<Cow<'data, [u8]>>,
-    endian: gimli::RunTimeEndian,
+    pub endian: gimli::RunTimeEndian,
 }
 
 impl<'data> UncompressedDwarf<'data> {
@@ -64,7 +64,6 @@ impl<'data> UncompressedDwarf<'data> {
                 return Ok(None);
             };
 
-        println!("Found type die!");
         Self::parse_type(&dwarf, &compilation_unit, unit_offset).map(move |t| Some(t))
     }
 
@@ -139,14 +138,6 @@ impl<'data> UncompressedDwarf<'data> {
         if let Some((_, entry)) = entries.next_dfs()? {
             let tag = entry.tag();
 
-            if let Some(name) = entry.attr_value(gimli::DW_AT_name)? {
-                let name = dwarf.attr_string(unit, name)?;
-                let name = name.to_string()?;
-                println!("Tag: {tag}, name: {name}");
-            } else {
-                println!("Tag: {tag}");
-            }
-
             // Parse known types
             match tag {
                 gimli::DW_TAG_base_type => Self::parse_base(entry),
@@ -177,7 +168,6 @@ impl<'data> UncompressedDwarf<'data> {
         unit: &Unit<R>,
         entries: &mut EntriesCursor<'_, '_, R>,
     ) -> Result<Type> {
-        println!("\tParsing enum!");
         let entry = entries.current().unwrap();
 
         let mut valid_values = BTreeMap::default();
@@ -252,8 +242,6 @@ impl<'data> UncompressedDwarf<'data> {
                 let name = get_attribute!(entry, gimli::DW_AT_name);
                 let name = dwarf.attr_string(unit, name)?;
                 let name = name.to_string()?.to_string();
-
-                println!("Parsing member: {}", name);
 
                 let offset = entry
                     .attr_value(gimli::DW_AT_data_member_location)?
