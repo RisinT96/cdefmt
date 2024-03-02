@@ -69,12 +69,17 @@ impl std::fmt::Display for Log {
         let mut index = 0;
 
         let replacer = |_: &Captures| -> String {
-            let res = self.args[index].format();
+            let value = if self.args.is_empty() {
+                // If we don't have any arguments, replace with empty string.
+                String::new()
+            } else {
+                let value = self.args[index].format();
+                index += 1;
+                index %= self.args.len();
+                value
+            };
 
-            index += 1;
-            index %= self.args.len();
-
-            res
+            value
         };
 
         let message = pattern.replace_all(&self.log_info.message, replacer);
