@@ -1,6 +1,7 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::format};
 
 use gimli::{Reader, ReaderOffset};
+use serde::de::value;
 
 use crate::{r#type::Type, Error, Result};
 
@@ -17,8 +18,13 @@ pub enum Var {
     I64(i64),
     F32(f32),
     F64(f64),
-    Enumeration { ty: Type, value: Box<Var> },
-    Structure { members: Vec<Var> },
+    Enumeration {
+        value: Box<Var>,
+        valid_values: BTreeMap<i128, String>,
+    },
+    Structure {
+        members: Vec<Var>,
+    },
     Pointer(Box<Var>),
 }
 
@@ -43,8 +49,8 @@ impl Var {
                 let (value, bytes) = Self::parse(&inner_type, data)?;
                 (
                     Var::Enumeration {
-                        ty: ty.clone(),
                         value: Box::new(value),
+                        valid_values: valid_values.clone(),
                     },
                     bytes,
                 )
@@ -71,5 +77,53 @@ impl Var {
                 (Var::Pointer(Box::new(value)), bytes)
             }
         })
+    }
+
+    pub fn format(&self) -> String {
+        match self {
+            Var::Bool(true) => "true".to_string(),
+            Var::Bool(false) => "false".to_string(),
+            Var::U8(val) => format!("{val}"),
+            Var::U16(val) => format!("{val}"),
+            Var::U32(val) => format!("{val}"),
+            Var::U64(val) => format!("{val}"),
+            Var::I8(val) => format!("{val}"),
+            Var::I16(val) => format!("{val}"),
+            Var::I32(val) => format!("{val}"),
+            Var::I64(val) => format!("{val}"),
+            Var::F32(val) => format!("{val}"),
+            Var::F64(val) => format!("{val}"),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => {
+                let value = match value.as_ref() {
+                    Var::U8(v) => *v as i128,
+                    Var::U16(v) => *v as i128,
+                    Var::U32(v) => *v as i128,
+                    Var::U64(v) => *v as i128,
+                    Var::I8(v) => *v as i128,
+                    Var::I16(v) => *v as i128,
+                    Var::I32(v) => *v as i128,
+                    Var::I64(v) => *v as i128,
+                    _ => unreachable!("C enums must have integer types!"),
+                };
+
+                valid_values
+                    .get(&value)
+                    .map(|name| name.to_owned())
+                    .unwrap_or_else(|| value.to_string())
+            }
+            Var::Structure { members } => {
+                "[".to_string()
+                    + &members
+                        .iter()
+                        .map(|m| m.format())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                    + "]"
+            }
+            Var::Pointer(value) => value.format(),
+        }
     }
 }

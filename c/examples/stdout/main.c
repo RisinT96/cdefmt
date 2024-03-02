@@ -38,10 +38,10 @@ int main(int argc, char* cargv[]) {
   enum some_enum e = SOME_ENUM_LOLZ;
   enum some_signed_enum e2 = SOME_SIGNED_ENUM_2;
 
-  CDEFMT_ERROR("What just happened?! {} {}", a, e2);
-  CDEFMT_WARNING("This wasn't supposed to happen... {}", 123);
+  CDEFMT_ERROR("What just happened?! [{}] [{}]", a, e2);
+  CDEFMT_WARNING("This wasn't supposed to happen... [{}]", 123);
   CDEFMT_INFO("Just letting you know: {}", true);
-  CDEFMT_DEBUG("Oh so you like debugging: {} {}", c, 123);
+  CDEFMT_DEBUG("Oh so you like debugging: {} [{}]", c, 123);
   CDEFMT_VERBOSE("I love spam! {} {} {} {}", a, b, c, e);
 
   return 0;

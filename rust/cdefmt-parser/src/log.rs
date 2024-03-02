@@ -26,6 +26,12 @@ pub enum Level {
     Verbose,
 }
 
+impl fmt::Display for Level {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad(&format!("{:?}", self))
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct Log {
     counter: usize,
@@ -118,6 +124,20 @@ impl<'data> LogParser<'data> {
     }
 }
 
+impl DataLog {
+    pub fn get_level(&self) -> Level {
+        self.log.level
+    }
+
+    pub fn get_file(&self) -> &str {
+        &self.log.file
+    }
+
+    pub fn get_line(&self) -> usize {
+        self.log.line
+    }
+}
+
 impl std::fmt::Display for DataLog {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let pattern = regex!("\\{\\}");
@@ -125,7 +145,7 @@ impl std::fmt::Display for DataLog {
         let mut index = 0;
 
         let replacer = |_: &Captures| -> String {
-            let res = format!("{:?}", self.args[index]);
+            let res = self.args[index].format();
 
             index += 1;
             index %= self.args.len();
