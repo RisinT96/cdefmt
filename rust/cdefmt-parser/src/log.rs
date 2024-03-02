@@ -74,7 +74,7 @@ impl<'data> LogParser<'data> {
     }
 
     pub fn parse_log(&mut self, data: &[u8]) -> Result<DataLog> {
-        let mut data = gimli::EndianSlice::new(data, self.dwarf.endian);
+        let mut data = gimli::EndianSlice::new(data, self.dwarf.endian());
         // TODO: Make safer, maybe switch to u64 everywhere.
         let log_id = data.read_address(self.address_size.bytes())? as usize;
         let log = self.get_log(log_id)?;

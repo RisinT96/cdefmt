@@ -19,7 +19,7 @@ macro_rules! get_attribute {
 #[derive(Debug)]
 pub(crate) struct Dwarf<'data> {
     dwarf: gimli::Dwarf<Cow<'data, [u8]>>,
-    pub endian: gimli::RunTimeEndian,
+    endian: gimli::RunTimeEndian,
 }
 
 impl<'data> Dwarf<'data> {
@@ -304,5 +304,9 @@ impl<'data> Dwarf<'data> {
         } else {
             Err(Error::NoNullTerm)
         }
+    }
+
+    pub(crate) fn endian(&self) -> gimli::RunTimeEndian {
+        self.endian
     }
 }
