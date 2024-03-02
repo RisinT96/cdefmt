@@ -11,6 +11,8 @@ struct some_struct {
   uint64_t c;
 };
 
+struct empty_struct {};
+
 enum some_enum {
   SOME_ENUM_FIRST,
   SOME_ENUM_WHAAAAT = 54,
@@ -35,12 +37,14 @@ int main(int argc, char* cargv[]) {
 
   bool c = false;
 
+  struct empty_struct d = {};
+
   enum some_enum e = SOME_ENUM_LOLZ;
   enum some_signed_enum e2 = SOME_SIGNED_ENUM_2;
 
   CDEFMT_ERROR("What just happened?! [{}] [{}]", a, e2);
   CDEFMT_WARNING("This wasn't supposed to happen... [{}]", 123);
-  CDEFMT_INFO("Just letting you know: {}", true);
+  CDEFMT_INFO("Just letting you know: {} {}", true, d);
   CDEFMT_DEBUG("Oh so you like debugging: {} [{}]", c, 123);
   CDEFMT_VERBOSE("I love spam! {} {} {} {}", a, b, c, e);
 

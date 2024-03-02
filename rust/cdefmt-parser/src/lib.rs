@@ -35,8 +35,10 @@ pub enum Error {
     UnsupportedPointerSize(u64),
     #[error("Encountered an unexpected tag: {0}")]
     UnexpectedTag(DwTag),
-    #[error("Encountered attribute with bad value.")]
+    #[error("Encountered an attribute with bad type")]
     BadAttribute,
+    #[error("There is no DIE at the given offset: {0}")]
+    NoDIE(u64),
     #[error("{0}")]
     Custom(&'static str),
 }

@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+// TODO: support booleans larger than 1 byte?
+
 #[derive(Debug, Clone)]
 pub enum Type {
     Bool,

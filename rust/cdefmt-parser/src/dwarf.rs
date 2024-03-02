@@ -1,4 +1,4 @@
-use gimli::{AttributeValue, DebuggingInformationEntry, UnitOffset};
+use gimli::{AttributeValue, DebuggingInformationEntry, ReaderOffset, UnitOffset};
 use gimli::{EndianSlice, EntriesCursor, Reader, Unit};
 use object::{File, Object, ObjectSection, ReadRef};
 use std::borrow::Cow;
@@ -16,6 +16,7 @@ macro_rules! get_attribute {
     };
 }
 
+/// Contains an uncompressed dwarf and it's endianness.
 #[derive(Debug)]
 pub(crate) struct Dwarf<'data> {
     dwarf: gimli::Dwarf<Cow<'data, [u8]>>,
@@ -23,6 +24,7 @@ pub(crate) struct Dwarf<'data> {
 }
 
 impl<'data> Dwarf<'data> {
+    /// Creates a new [`Dwarf`]
     pub(crate) fn new<R: ReadRef<'data>>(file: &File<'data, R>) -> Result<Self> {
         let endian = if file.is_little_endian() {
             gimli::RunTimeEndian::Little
@@ -30,7 +32,10 @@ impl<'data> Dwarf<'data> {
             gimli::RunTimeEndian::Big
         };
 
-        // Load a section and return as `Cow<[u8]>`.
+        // We want the uncompressed sections, this returns a [`Cow`] that we have to store somewhere
+        // for future use.
+        // Unfortunately it's impossible to directly convert this Cow into an EndianSlice and store
+        // only the endian slice, so we'll have to perform the conversion every time we need.
         let load_section = |id: gimli::SectionId| -> Result<std::borrow::Cow<[u8]>> {
             match file.section_by_name(id.name()) {
                 Some(ref section) => Ok(section.uncompressed_data()?),
@@ -44,29 +49,41 @@ impl<'data> Dwarf<'data> {
         Ok(Self { dwarf, endian })
     }
 
+    /// Returns the loaded dwarf's endianness.
+    pub(crate) fn endian(&self) -> gimli::RunTimeEndian {
+        self.endian
+    }
+
+    /// Tries to find the type whose name is `type_name` and is located in the compilation unit
+    /// `compilation_unit_name`.
+    ///
+    /// Output:
+    /// * Returns `Ok(Some)` if the type is successfully found.
+    /// * Returns `Ok(None)` if the type cannot be found.
+    /// * Returns `Err` if an error is encountered.
     pub(crate) fn get_type(
         &'data self,
-        compilation_unit: &str,
+        compilation_unit_name: &str,
         type_name: &str,
     ) -> Result<Option<Type>> {
         let dwarf = self.borrow();
         let compilation_unit =
-            if let Some(c) = Self::find_compilation_unit(&dwarf, compilation_unit)? {
+            if let Some(c) = find_compilation_unit(&dwarf, compilation_unit_name)? {
                 c
             } else {
                 return Ok(None);
             };
 
-        let unit_offset =
-            if let Some(c) = Self::find_type_die(&dwarf, &compilation_unit, type_name)? {
-                c
-            } else {
-                return Ok(None);
-            };
+        let unit_offset = if let Some(c) = find_type_die(&dwarf, &compilation_unit, type_name)? {
+            c
+        } else {
+            return Ok(None);
+        };
 
-        Self::parse_type(&dwarf, &compilation_unit, unit_offset).map(Some)
+        parse_type(&dwarf, &compilation_unit, unit_offset).map(Some)
     }
 
+    /// Converts self into an EndianSlice Dwarf.
     fn borrow(&'data self) -> gimli::Dwarf<EndianSlice<'data, gimli::RunTimeEndian>> {
         // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
         let borrow_section =
@@ -74,239 +91,282 @@ impl<'data> Dwarf<'data> {
 
         self.dwarf.borrow(&borrow_section)
     }
+}
 
-    fn find_compilation_unit<R: Reader>(
-        dwarf: &gimli::Dwarf<R>,
-        name: &str,
-    ) -> Result<Option<Unit<R>>> {
-        // Iterate over the compilation units.
-        let mut iter = dwarf.units();
-        while let Some(header) = iter.next()? {
-            let unit = dwarf.unit(header)?;
+/// Tries to find the compilation unit by name.
+///
+/// Output:
+/// * Returns `Ok(Some)` if the compilation unit is successfully found.
+/// * Returns `Ok(None)` if the compilation unit cannot be found.
+/// * Returns `Err` if an error is encountered.
+fn find_compilation_unit<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    name: &str,
+) -> Result<Option<Unit<R>>> {
+    // Iterate over all the unit headers.
+    let mut iter = dwarf.units();
+    while let Some(header) = iter.next()? {
+        let unit = dwarf.unit(header)?;
 
-            // Iterate over the Debugging Information Entries (DIEs) in the compilation units.
-            let mut entries = unit.entries();
-            while let Some((_, entry)) = entries.next_dfs()? {
-                if entry.tag() != gimli::DW_TAG_compile_unit {
-                    continue;
-                }
-
-                // Found compilation unit DIE, should usually be first in the file.
-
-                // Find compilation unit name, check if it equals the provided name.
-                let name_attribute = entry
-                    .attr_value(gimli::DW_AT_name)?
-                    .ok_or(Error::NoAttribute(gimli::DW_AT_name))?;
-                let unit_name = dwarf.attr_string(&unit, name_attribute)?;
-                let unit_name = unit_name.to_string()?;
-
-                if name == unit_name {
-                    return Ok(Some(unit));
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
-    fn find_type_die<R: Reader>(
-        dwarf: &gimli::Dwarf<R>,
-        compilation_unit: &Unit<R>,
-        type_name: &str,
-    ) -> Result<Option<UnitOffset<R::Offset>>> {
-        // Iterate over the Debugging Information Entries (DIEs) in the unit.
-        let mut entries = compilation_unit.entries();
+        // Iterate over the Debugging Information Entries (DIEs) in the unit header, usually the
+        // the first one is the compilation unit DIE.
+        let mut entries = unit.entries();
         while let Some((_, entry)) = entries.next_dfs()? {
-            if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
-                let name = dwarf.attr_string(compilation_unit, name_attribute)?;
-                let name = name.to_string()?;
-
-                if name == type_name {
-                    // Found our entry.
-                    return Ok(Some(entry.offset()));
-                }
+            if entry.tag() != gimli::DW_TAG_compile_unit {
+                continue;
             }
-        }
 
-        Ok(None)
-    }
+            let name_attribute = get_attribute!(entry, gimli::DW_AT_name);
+            let unit_name = dwarf.attr_string(&unit, name_attribute)?;
+            let unit_name = unit_name.to_string()?;
 
-    fn parse_type<R: Reader>(
-        dwarf: &gimli::Dwarf<R>,
-        unit: &Unit<R>,
-        start_offset: UnitOffset<R::Offset>,
-    ) -> Result<Type> {
-        let mut entries = unit.entries_at_offset(start_offset)?;
-
-        if let Some((_, entry)) = entries.next_dfs()? {
-            let tag = entry.tag();
-
-            // Parse known types
-            match tag {
-                gimli::DW_TAG_base_type => Self::parse_base(entry),
-                gimli::DW_TAG_enumeration_type => {
-                    Self::parse_enumeration(dwarf, unit, &mut entries)
-                }
-                gimli::DW_TAG_pointer_type => Self::parse_pointer(entry),
-                gimli::DW_TAG_structure_type => Self::parse_structure(dwarf, unit, &mut entries),
-                gimli::DW_TAG_const_type | gimli::DW_TAG_typedef => {
-                    let type_ref = get_attribute!(entry, gimli::DW_AT_type);
-
-                    if let AttributeValue::UnitRef(unit_ref) = type_ref {
-                        Self::parse_type(dwarf, unit, unit_ref)
-                    } else {
-                        Err(Error::NoNullTerm)
-                    }
-                }
-                _ => Err(Error::UnexpectedTag(tag)),
+            if name == unit_name {
+                return Ok(Some(unit));
             }
-        } else {
-            Err(Error::NoNullTerm)
         }
     }
 
-    /// Parses an enumeration DIE
-    fn parse_enumeration<R: Reader>(
-        dwarf: &gimli::Dwarf<R>,
-        unit: &Unit<R>,
-        entries: &mut EntriesCursor<'_, '_, R>,
-    ) -> Result<Type> {
-        let entry = entries.current().unwrap();
+    Ok(None)
+}
 
-        let mut valid_values = BTreeMap::default();
+/// Tries to find the DIE representing the type in the provided compilation unit.
+/// Returns the DIE's offset in the unit.
+///
+/// Output:
+/// * Returns `Ok(Some)` if the type DIE is successfully found.
+/// * Returns `Ok(None)` if the type DIE cannot be found.
+/// * Returns `Err` if an error is encountered.
+fn find_type_die<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    compilation_unit: &Unit<R>,
+    type_name: &str,
+) -> Result<Option<UnitOffset<R::Offset>>> {
+    // Iterate over the Debugging Information Entries (DIEs) in the unit.
+    let mut entries = compilation_unit.entries();
+    while let Some((_, entry)) = entries.next_dfs()? {
+        // Check each DIE's name.
+        if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
+            let name = dwarf.attr_string(compilation_unit, name_attribute)?;
+            let name = name.to_string()?;
 
-        let ty = if let AttributeValue::UnitRef(unit_offset) =
-            get_attribute!(entry, gimli::DW_AT_type)
-        {
-            Self::parse_type(dwarf, unit, unit_offset)?
-        } else {
-            return Err(Error::BadAttribute);
-        };
+            if name == type_name {
+                // Found our DIE.
+                return Ok(Some(entry.offset()));
+            }
+        }
+    }
 
-        // Step into member DIEs
-        if let Some((1, mut entry)) = entries.next_dfs()? {
-            // Iterate over all the siblings until there's no more.
-            loop {
-                let name = get_attribute!(entry, gimli::DW_AT_name);
-                let name = dwarf.attr_string(unit, name)?;
-                let name = name.to_string()?.to_string();
+    Ok(None)
+}
 
-                let value = match ty {
-                    Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
-                        .attr_value(gimli::DW_AT_const_value)?
-                        .and_then(|o| o.sdata_value())
-                        .unwrap_or(0)
-                        as i128,
-                    Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
-                        .attr_value(gimli::DW_AT_const_value)?
-                        .and_then(|o| o.udata_value())
-                        .unwrap_or(0)
-                        as i128,
-                    _ => unreachable!("C enums must have integer types!"),
-                };
+/// Parses the type whose description starts at the provided offset.
+///
+/// Output:
+/// * Returns `Ok` if the type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_type<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    unit: &Unit<R>,
+    start_offset: UnitOffset<R::Offset>,
+) -> Result<Type> {
+    let mut entries = unit.entries_at_offset(start_offset)?;
 
-                valid_values.insert(value, name);
+    if let Some((_, entry)) = entries.next_dfs()? {
+        let tag = entry.tag();
 
-                entry = if let Some(e) = entries.next_sibling()? {
-                    e
+        // Parse known types
+        match tag {
+            gimli::DW_TAG_base_type => parse_base(entry),
+            gimli::DW_TAG_enumeration_type => parse_enumeration(dwarf, unit, entries),
+            gimli::DW_TAG_pointer_type => parse_pointer(entry),
+            gimli::DW_TAG_structure_type => parse_structure(dwarf, unit, entries),
+            gimli::DW_TAG_const_type | gimli::DW_TAG_typedef => {
+                let type_ref = get_attribute!(entry, gimli::DW_AT_type);
+
+                if let AttributeValue::UnitRef(unit_ref) = type_ref {
+                    parse_type(dwarf, unit, unit_ref)
                 } else {
-                    break;
-                };
+                    Err(Error::NoNullTerm)
+                }
             }
+            _ => Err(Error::UnexpectedTag(tag)),
         }
-
-        Ok(Type::Enumeration {
-            ty: Box::new(ty),
-            valid_values,
-        })
+    } else {
+        Err(Error::NoDIE(start_offset.0.into_u64()))
     }
+}
 
-    /// Parses a structure DIE
-    fn parse_structure<R: Reader>(
-        dwarf: &gimli::Dwarf<R>,
-        unit: &Unit<R>,
-        entries: &mut EntriesCursor<'_, '_, R>,
-    ) -> Result<Type> {
-        let mut members = vec![];
+/// Parses the enumeration type whose DIE is pointed to by the entries cursor.
+///
+/// Output:
+/// * Returns `Ok` if the enumeration type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_enumeration<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    unit: &Unit<R>,
+    mut entries: EntriesCursor<'_, '_, R>,
+) -> Result<Type> {
+    // Figure out the type of the storage used by the enum.
+    // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
+    let entry = entries.current().unwrap();
+    let ty = parse_enumeration_storage(dwarf, unit, entry)?;
+    let mut valid_values = BTreeMap::default();
 
-        // Step into member DIEs
-        if let Some((1, mut entry)) = entries.next_dfs()? {
-            // Iterate over all the siblings until there's no more.
-            loop {
-                let name = get_attribute!(entry, gimli::DW_AT_name);
-                let name = dwarf.attr_string(unit, name)?;
-                let name = name.to_string()?.to_string();
+    // Step into member DIEs
+    if let Some((1, mut entry)) = entries.next_dfs()? {
+        // Iterate over all the siblings (DW_TAG_enumerator DIEs)
+        loop {
+            let name = get_attribute!(entry, gimli::DW_AT_name);
+            let name = dwarf.attr_string(unit, name)?;
+            let name = name.to_string()?;
 
-                let offset = entry
-                    .attr_value(gimli::DW_AT_data_member_location)?
+            let value = match ty {
+                Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
+                    .attr_value(gimli::DW_AT_const_value)?
+                    .and_then(|o| o.sdata_value())
+                    .unwrap()
+                    as i128,
+                Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
+                    .attr_value(gimli::DW_AT_const_value)?
                     .and_then(|o| o.udata_value())
-                    .unwrap_or(0);
+                    .unwrap()
+                    as i128,
+                _ => unreachable!("C enums must have integer types!"),
+            };
 
-                if let AttributeValue::UnitRef(unit_offset) =
-                    get_attribute!(entry, gimli::DW_AT_type)
-                {
-                    let ty = Self::parse_type(dwarf, unit, unit_offset)?;
-                    members.push(StructureMember { name, ty, offset });
-                } else {
-                    return Err(Error::BadAttribute);
-                }
+            valid_values.insert(value, name.to_string());
 
-                entry = if let Some(e) = entries.next_sibling()? {
-                    e
-                } else {
-                    break;
-                };
-            }
-        }
-
-        Ok(Type::Structure(members))
-    }
-
-    /// Parses a base type DIE
-    fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
-        let encoding = get_attribute!(entry, gimli::DW_AT_encoding);
-        let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
-
-        if let (AttributeValue::Encoding(encoding), AttributeValue::Udata(byte_size)) =
-            (encoding, byte_size)
-        {
-            match (encoding, byte_size) {
-                (gimli::DW_ATE_boolean, 1) => Ok(Type::Bool),
-                (gimli::DW_ATE_unsigned, 1) => Ok(Type::U8),
-                (gimli::DW_ATE_unsigned, 2) => Ok(Type::U16),
-                (gimli::DW_ATE_unsigned, 4) => Ok(Type::U32),
-                (gimli::DW_ATE_unsigned, 8) => Ok(Type::U64),
-                (gimli::DW_ATE_signed, 1) => Ok(Type::I8),
-                (gimli::DW_ATE_signed, 2) => Ok(Type::I16),
-                (gimli::DW_ATE_signed, 4) => Ok(Type::I32),
-                (gimli::DW_ATE_signed, 8) => Ok(Type::I64),
-                (gimli::DW_ATE_float, 4) => Ok(Type::F32),
-                (gimli::DW_ATE_float, 8) => Ok(Type::F64),
-                _ => Err(Error::UnsupportedBaseType(encoding, byte_size)),
-            }
-        } else {
-            Err(Error::NoNullTerm)
+            entry = if let Some(e) = entries.next_sibling()? {
+                e
+            } else {
+                // Reached end of DW_TAG_enumerator DIEs
+                break;
+            };
         }
     }
 
-    /// Parses a pointer type DIE
-    fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
-        let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
+    Ok(Type::Enumeration {
+        ty: Box::new(ty),
+        valid_values,
+    })
+}
 
-        if let AttributeValue::Udata(byte_size) = byte_size {
-            Ok(Type::Pointer(Box::new(match byte_size {
-                1 => Type::U8,
-                2 => Type::U16,
-                4 => Type::U32,
-                8 => Type::U64,
-                _ => return Err(Error::UnsupportedPointerSize(byte_size)),
-            })))
-        } else {
-            Err(Error::NoNullTerm)
+/// Tries to determine an enumerator's storage type.
+///
+/// Output:
+/// * Returns `Ok` if the enumeration type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_enumeration_storage<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    unit: &Unit<R>,
+    entry: &DebuggingInformationEntry<'_, '_, R>,
+) -> Result<Type> {
+    if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {
+        parse_type(dwarf, unit, unit_offset)
+    } else {
+        parse_base(entry)
+    }
+}
+
+/// Parses the structure type whose DIE is pointed to by the entries cursor.
+///
+/// Output:
+/// * Returns `Ok` if the structure type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_structure<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    unit: &Unit<R>,
+    mut entries: EntriesCursor<'_, '_, R>,
+) -> Result<Type> {
+    let mut members = vec![];
+
+    // Step into member DIEs
+    if let Some((1, mut entry)) = entries.next_dfs()? {
+        // Iterate over all the siblings until there's no more.
+        loop {
+            // Get the name of the member.
+            let name = get_attribute!(entry, gimli::DW_AT_name);
+            let name = dwarf.attr_string(unit, name)?;
+            let name = name.to_string()?.to_string();
+
+            // Get the type of the member.
+            let ty = if let AttributeValue::UnitRef(unit_offset) =
+                get_attribute!(entry, gimli::DW_AT_type)
+            {
+                parse_type(dwarf, unit, unit_offset)?
+            } else {
+                return Err(Error::BadAttribute);
+            };
+
+            // Get the members offset from the struct's beginning.
+            let offset = entry
+                .attr_value(gimli::DW_AT_data_member_location)?
+                .and_then(|o| o.udata_value())
+                .unwrap_or(0);
+
+            members.push(StructureMember { name, ty, offset });
+
+            // Get next sibling or break iteration.
+            entry = if let Some(e) = entries.next_sibling()? {
+                e
+            } else {
+                break;
+            };
         }
     }
 
-    pub(crate) fn endian(&self) -> gimli::RunTimeEndian {
-        self.endian
+    Ok(Type::Structure(members))
+}
+
+/// Parses a base type DIE
+///
+/// Output:
+/// * Returns `Ok` if the base type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
+    // TODO: use bit_size if byte_size not available?
+    let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
+    let encoding = get_attribute!(entry, gimli::DW_AT_encoding);
+
+    if let (AttributeValue::Udata(byte_size), AttributeValue::Encoding(encoding)) =
+        (byte_size, encoding)
+    {
+        match (byte_size, encoding) {
+            (1, gimli::DW_ATE_boolean) => Ok(Type::Bool),
+            (1, gimli::DW_ATE_unsigned) => Ok(Type::U8),
+            (2, gimli::DW_ATE_unsigned) => Ok(Type::U16),
+            (4, gimli::DW_ATE_unsigned) => Ok(Type::U32),
+            (8, gimli::DW_ATE_unsigned) => Ok(Type::U64),
+            (1, gimli::DW_ATE_signed) => Ok(Type::I8),
+            (2, gimli::DW_ATE_signed) => Ok(Type::I16),
+            (4, gimli::DW_ATE_signed) => Ok(Type::I32),
+            (8, gimli::DW_ATE_signed) => Ok(Type::I64),
+            (4, gimli::DW_ATE_float) => Ok(Type::F32),
+            (8, gimli::DW_ATE_float) => Ok(Type::F64),
+            _ => Err(Error::UnsupportedBaseType(encoding, byte_size)),
+        }
+    } else {
+        Err(Error::BadAttribute)
+    }
+}
+
+/// Parses a pointer type DIE
+///
+/// Output:
+/// * Returns `Ok` if the pointer type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
+    let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
+
+    if let AttributeValue::Udata(byte_size) = byte_size {
+        Ok(Type::Pointer(Box::new(match byte_size {
+            1 => Type::U8,
+            2 => Type::U16,
+            4 => Type::U32,
+            8 => Type::U64,
+            _ => return Err(Error::UnsupportedPointerSize(byte_size)),
+        })))
+    } else {
+        Err(Error::BadAttribute)
     }
 }
