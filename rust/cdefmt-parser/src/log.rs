@@ -113,7 +113,7 @@ impl<'data> LogParser<'data> {
 
         members
             .iter()
-            .map(|m| Var::parse(&m.ty, &mut data))
+            .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect()
     }
 }
