@@ -69,7 +69,7 @@ impl std::fmt::Display for Log {
         let mut index = 0;
 
         let replacer = |_: &Captures| -> String {
-            let value = if self.args.is_empty() {
+            if self.args.is_empty() {
                 // If we don't have any arguments, replace with empty string.
                 String::new()
             } else {
@@ -77,9 +77,7 @@ impl std::fmt::Display for Log {
                 index += 1;
                 index %= self.args.len();
                 value
-            };
-
-            value
+            }
         };
 
         let message = pattern.replace_all(&self.log_info.message, replacer);
