@@ -73,6 +73,10 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   "\"line\":"CDEFMT_STRINGIFY(line_)"," \
   "\"message\":\""message_"\"}"
 
+#define CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_)               \
+  const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
+      CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_)
+
 /* Expands into a call to the correct log macro, the first argument of the
  * __VA_ARGS__ is the message (as it's required), this is done to overcome the
  * limitation of having at least one argument */
@@ -81,86 +85,81 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   (__COUNTER__, level_, __FILE__, __LINE__, __VA_ARGS__)
 
 /* Log with 0 arguments */
-#define __CDEFMT_LOG1(counter_, level_, file_, line_, message_)                           \
-  do {                                                                                    \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                  \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                          \
-      const char* log_id;                                                                 \
-    };                                                                                    \
-                                                                                          \
-    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                      \
-        .log_id = CDEFMT_LOG_STRING(counter_),                                            \
-    };                                                                                    \
-                                                                                          \
-    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);    \
+#define __CDEFMT_LOG1(counter_, level_, file_, line_, message_)                        \
+  do {                                                                                 \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                 \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                       \
+      const char* log_id;                                                              \
+    };                                                                                 \
+                                                                                       \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
+        .log_id = CDEFMT_LOG_STRING(counter_),                                         \
+    };                                                                                 \
+                                                                                       \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
 
 /* Log with 1 argument */
-#define __CDEFMT_LOG2(counter_, level_, file_, line_, message_, arg1_)                    \
-  do {                                                                                    \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                  \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                          \
-      const char* log_id;                                                                 \
-      const __typeof__(arg1_) arg1;                                                       \
-    };                                                                                    \
-                                                                                          \
-    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                      \
-        .log_id = CDEFMT_LOG_STRING(counter_),                                            \
-        .arg1 = arg1_,                                                                    \
-    };                                                                                    \
-                                                                                          \
-    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);    \
+#define __CDEFMT_LOG2(counter_, level_, file_, line_, message_, arg1_)                 \
+  do {                                                                                 \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                 \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                       \
+      const char* log_id;                                                              \
+      const __typeof__(arg1_) arg1;                                                    \
+    };                                                                                 \
+                                                                                       \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
+        .log_id = CDEFMT_LOG_STRING(counter_),                                         \
+        .arg1 = arg1_,                                                                 \
+    };                                                                                 \
+                                                                                       \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
 
 /* Log with 2 arguments */
-#define __CDEFMT_LOG3(counter_, level_, file_, line_, message_, arg1_, arg2_)             \
-  do {                                                                                    \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                  \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                          \
-      const char* log_id;                                                                 \
-      const __typeof__(arg1_) arg1;                                                       \
-      const __typeof__(arg2_) arg2;                                                       \
-    };                                                                                    \
-                                                                                          \
-    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                      \
-        .log_id = CDEFMT_LOG_STRING(counter_),                                            \
-        .arg1 = arg1_,                                                                    \
-        .arg2 = arg2_,                                                                    \
-    };                                                                                    \
-                                                                                          \
-    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);    \
+#define __CDEFMT_LOG3(counter_, level_, file_, line_, message_, arg1_, arg2_)          \
+  do {                                                                                 \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                 \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                       \
+      const char* log_id;                                                              \
+      const __typeof__(arg1_) arg1;                                                    \
+      const __typeof__(arg2_) arg2;                                                    \
+    };                                                                                 \
+                                                                                       \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
+        .log_id = CDEFMT_LOG_STRING(counter_),                                         \
+        .arg1 = arg1_,                                                                 \
+        .arg2 = arg2_,                                                                 \
+    };                                                                                 \
+                                                                                       \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
 
 /* Log with 3 arguments */
-#define __CDEFMT_LOG4(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_)      \
-  do {                                                                                    \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                  \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                          \
-      const char* log_id;                                                                 \
-      const __typeof__(arg1_) arg1;                                                       \
-      const __typeof__(arg2_) arg2;                                                       \
-      const __typeof__(arg3_) arg3;                                                       \
-    };                                                                                    \
-                                                                                          \
-    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                      \
-        .log_id = CDEFMT_LOG_STRING(counter_),                                            \
-        .arg1 = arg1_,                                                                    \
-        .arg2 = arg2_,                                                                    \
-        .arg3 = arg3_,                                                                    \
-    };                                                                                    \
-                                                                                          \
-    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);    \
+#define __CDEFMT_LOG4(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_)   \
+  do {                                                                                 \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                 \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                       \
+      const char* log_id;                                                              \
+      const __typeof__(arg1_) arg1;                                                    \
+      const __typeof__(arg2_) arg2;                                                    \
+      const __typeof__(arg3_) arg3;                                                    \
+    };                                                                                 \
+                                                                                       \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
+        .log_id = CDEFMT_LOG_STRING(counter_),                                         \
+        .arg1 = arg1_,                                                                 \
+        .arg2 = arg2_,                                                                 \
+        .arg3 = arg3_,                                                                 \
+    };                                                                                 \
+                                                                                       \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
 
 /* Log with 4 arguments */
 #define __CDEFMT_LOG5(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_, arg4_) \
   do {                                                                                      \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] =   \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                    \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                      \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                            \
       const char* log_id;                                                                   \
       const __typeof__(arg1_) arg1;                                                         \
@@ -183,8 +182,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 /* Log with 5 arguments */
 #define __CDEFMT_LOG6(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_, arg4_, arg5_) \
   do {                                                                                             \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] =          \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                           \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                             \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
       const char* log_id;                                                                          \
       const __typeof__(arg1_) arg1;                                                                \
@@ -210,8 +208,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define __CDEFMT_LOG7(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_, arg4_, arg5_, \
                       arg6_)                                                                       \
   do {                                                                                             \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] =          \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                           \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                             \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
       const char* log_id;                                                                          \
       const __typeof__(arg1_) arg1;                                                                \
@@ -239,8 +236,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define __CDEFMT_LOG8(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_, arg4_, arg5_, \
                       arg6_, arg7_)                                                                \
   do {                                                                                             \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] =          \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                           \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                             \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
       const char* log_id;                                                                          \
       const __typeof__(arg1_) arg1;                                                                \
@@ -270,8 +266,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define __CDEFMT_LOG9(counter_, level_, file_, line_, message_, arg1_, arg2_, arg3_, arg4_, arg5_, \
                       arg6_, arg7_, arg8_)                                                         \
   do {                                                                                             \
-    const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] =          \
-        CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_);                           \
+    CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_);                             \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
       const char* log_id;                                                                          \
       const __typeof__(arg1_) arg1;                                                                \
