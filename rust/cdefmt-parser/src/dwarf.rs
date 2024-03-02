@@ -333,11 +333,11 @@ fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result
     {
         match (byte_size, encoding) {
             (1, gimli::DW_ATE_boolean) => Ok(Type::Bool),
-            (1, gimli::DW_ATE_unsigned) => Ok(Type::U8),
+            (1, gimli::DW_ATE_unsigned | gimli::DW_ATE_unsigned_char) => Ok(Type::U8),
             (2, gimli::DW_ATE_unsigned) => Ok(Type::U16),
             (4, gimli::DW_ATE_unsigned) => Ok(Type::U32),
             (8, gimli::DW_ATE_unsigned) => Ok(Type::U64),
-            (1, gimli::DW_ATE_signed) => Ok(Type::I8),
+            (1, gimli::DW_ATE_signed | gimli::DW_ATE_signed_char) => Ok(Type::I8),
             (2, gimli::DW_ATE_signed) => Ok(Type::I16),
             (4, gimli::DW_ATE_signed) => Ok(Type::I32),
             (8, gimli::DW_ATE_signed) => Ok(Type::I64),
