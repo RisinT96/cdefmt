@@ -133,6 +133,11 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("HAHA I LIED! gave you no args at all! [{}, {}, {}, {}]");
   CDEFMT_INFO("HAHA I LIED! gave you less args than in format string! [{}, {}, {}, {}]", 1, 2, 3);
 
+  // Of course can print same log with different values.
+  for (size_t i = 0; i < 10; i++) {
+    CDEFMT_INFO("Iteration {}", i);
+  }
+
   return 0;
 }
 
