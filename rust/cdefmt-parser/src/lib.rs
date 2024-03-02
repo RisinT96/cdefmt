@@ -1,9 +1,13 @@
 use gimli::{DwAte, DwTag, SectionId};
 
-pub mod dwarf;
+mod dwarf;
+mod r#type;
+
 pub mod log;
-pub mod r#type;
+pub mod parser;
 pub mod var;
+
+pub use parser::Parser;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

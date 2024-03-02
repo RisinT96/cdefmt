@@ -1,4 +1,4 @@
-use cdefmt_parser::log::LogParser;
+use cdefmt_parser::Parser;
 
 /// Takes path to elf as argument, and parses logs whose IDs are read from stdin.
 /// Example usage:
@@ -8,7 +8,7 @@ fn main() -> std::result::Result<(), String> {
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| e.to_string())?;
 
-    let mut logger = LogParser::new(&*mmap).map_err(|e| e.to_string())?;
+    let mut logger = Parser::new(&*mmap).map_err(|e| e.to_string())?;
 
     let stdin = std::io::stdin();
     let mut buff = Default::default();
