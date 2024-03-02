@@ -20,7 +20,7 @@ fn main() -> std::result::Result<(), String> {
 
         let parsed_buff = buff
             .trim()
-            .split(";")
+            .split(';')
             .map(|b| u8::from_str_radix(b, 16).unwrap())
             .collect::<Vec<_>>();
         let log = logger.parse_log(&parsed_buff);

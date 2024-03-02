@@ -1,5 +1,5 @@
 use gimli::{AttributeValue, DebuggingInformationEntry, UnitOffset};
-use gimli::{Dwarf, EndianSlice, EntriesCursor, Reader, Unit};
+use gimli::{EndianSlice, EntriesCursor, Reader, Unit};
 use object::{File, Object, ObjectSection, ReadRef};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -17,12 +17,12 @@ macro_rules! get_attribute {
 }
 
 #[derive(Debug)]
-pub(crate) struct UncompressedDwarf<'data> {
-    dwarf: Dwarf<Cow<'data, [u8]>>,
+pub(crate) struct Dwarf<'data> {
+    dwarf: gimli::Dwarf<Cow<'data, [u8]>>,
     pub endian: gimli::RunTimeEndian,
 }
 
-impl<'data> UncompressedDwarf<'data> {
+impl<'data> Dwarf<'data> {
     pub(crate) fn new<R: ReadRef<'data>>(file: &File<'data, R>) -> Result<Self> {
         let endian = if file.is_little_endian() {
             gimli::RunTimeEndian::Little
@@ -64,10 +64,10 @@ impl<'data> UncompressedDwarf<'data> {
                 return Ok(None);
             };
 
-        Self::parse_type(&dwarf, &compilation_unit, unit_offset).map(move |t| Some(t))
+        Self::parse_type(&dwarf, &compilation_unit, unit_offset).map(Some)
     }
 
-    fn borrow(&'data self) -> Dwarf<EndianSlice<'data, gimli::RunTimeEndian>> {
+    fn borrow(&'data self) -> gimli::Dwarf<EndianSlice<'data, gimli::RunTimeEndian>> {
         // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
         let borrow_section =
             |section: &'data Cow<'_, [u8]>| gimli::EndianSlice::new(section, self.endian);
@@ -75,7 +75,10 @@ impl<'data> UncompressedDwarf<'data> {
         self.dwarf.borrow(&borrow_section)
     }
 
-    fn find_compilation_unit<R: Reader>(dwarf: &Dwarf<R>, name: &str) -> Result<Option<Unit<R>>> {
+    fn find_compilation_unit<R: Reader>(
+        dwarf: &gimli::Dwarf<R>,
+        name: &str,
+    ) -> Result<Option<Unit<R>>> {
         // Iterate over the compilation units.
         let mut iter = dwarf.units();
         while let Some(header) = iter.next()? {
@@ -107,7 +110,7 @@ impl<'data> UncompressedDwarf<'data> {
     }
 
     fn find_type_die<R: Reader>(
-        dwarf: &Dwarf<R>,
+        dwarf: &gimli::Dwarf<R>,
         compilation_unit: &Unit<R>,
         type_name: &str,
     ) -> Result<Option<UnitOffset<R::Offset>>> {
@@ -115,7 +118,7 @@ impl<'data> UncompressedDwarf<'data> {
         let mut entries = compilation_unit.entries();
         while let Some((_, entry)) = entries.next_dfs()? {
             if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
-                let name = dwarf.attr_string(&compilation_unit, name_attribute)?;
+                let name = dwarf.attr_string(compilation_unit, name_attribute)?;
                 let name = name.to_string()?;
 
                 if name == type_name {
@@ -129,7 +132,7 @@ impl<'data> UncompressedDwarf<'data> {
     }
 
     fn parse_type<R: Reader>(
-        dwarf: &Dwarf<R>,
+        dwarf: &gimli::Dwarf<R>,
         unit: &Unit<R>,
         start_offset: UnitOffset<R::Offset>,
     ) -> Result<Type> {
@@ -164,7 +167,7 @@ impl<'data> UncompressedDwarf<'data> {
 
     /// Parses an enumeration DIE
     fn parse_enumeration<R: Reader>(
-        dwarf: &Dwarf<R>,
+        dwarf: &gimli::Dwarf<R>,
         unit: &Unit<R>,
         entries: &mut EntriesCursor<'_, '_, R>,
     ) -> Result<Type> {
@@ -191,14 +194,12 @@ impl<'data> UncompressedDwarf<'data> {
                 let value = match ty {
                     Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
                         .attr_value(gimli::DW_AT_const_value)?
-                        .map(|o| o.sdata_value())
-                        .flatten()
+                        .and_then(|o| o.sdata_value())
                         .unwrap_or(0)
                         as i128,
                     Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
                         .attr_value(gimli::DW_AT_const_value)?
-                        .map(|o| o.udata_value())
-                        .flatten()
+                        .and_then(|o| o.udata_value())
                         .unwrap_or(0)
                         as i128,
                     _ => unreachable!("C enums must have integer types!"),
@@ -222,17 +223,10 @@ impl<'data> UncompressedDwarf<'data> {
 
     /// Parses a structure DIE
     fn parse_structure<R: Reader>(
-        dwarf: &Dwarf<R>,
+        dwarf: &gimli::Dwarf<R>,
         unit: &Unit<R>,
         entries: &mut EntriesCursor<'_, '_, R>,
     ) -> Result<Type> {
-        let entry = entries.current().unwrap();
-        let name = entry
-            .attr_value(gimli::DW_AT_name)?
-            .ok_or(Error::NoAttribute(gimli::DW_AT_name))?;
-        let name = dwarf.attr_string(unit, name)?;
-        let name = name.to_string()?.to_string();
-
         let mut members = vec![];
 
         // Step into member DIEs
@@ -245,8 +239,7 @@ impl<'data> UncompressedDwarf<'data> {
 
                 let offset = entry
                     .attr_value(gimli::DW_AT_data_member_location)?
-                    .map(|o| o.udata_value())
-                    .flatten()
+                    .and_then(|o| o.udata_value())
                     .unwrap_or(0);
 
                 if let AttributeValue::UnitRef(unit_offset) =
@@ -266,7 +259,7 @@ impl<'data> UncompressedDwarf<'data> {
             }
         }
 
-        Ok(Type::Structure { members, name })
+        Ok(Type::Structure(members))
     }
 
     /// Parses a base type DIE

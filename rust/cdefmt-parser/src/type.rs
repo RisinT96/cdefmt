@@ -18,10 +18,7 @@ pub enum Type {
         /// Use i128 to deal with u64 and i64 enums.
         valid_values: BTreeMap<i128, String>,
     },
-    Structure {
-        name: String,
-        members: Vec<StructureMember>,
-    },
+    Structure(Vec<StructureMember>),
     Pointer(Box<Type>),
 }
 

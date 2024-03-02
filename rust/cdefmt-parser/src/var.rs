@@ -1,9 +1,8 @@
-use std::{collections::BTreeMap, fmt::format};
+use std::collections::BTreeMap;
 
 use gimli::{Reader, ReaderOffset};
-use serde::de::value;
 
-use crate::{r#type::Type, Error, Result};
+use crate::{r#type::Type, Result};
 
 #[derive(Debug, Clone)]
 pub enum Var {
@@ -46,7 +45,7 @@ impl Var {
                 ty: inner_type,
                 valid_values,
             } => {
-                let (value, bytes) = Self::parse(&inner_type, data)?;
+                let (value, bytes) = Self::parse(inner_type, data)?;
                 (
                     Var::Enumeration {
                         value: Box::new(value),
@@ -55,7 +54,7 @@ impl Var {
                     bytes,
                 )
             }
-            Type::Structure { name, members } => {
+            Type::Structure(members) => {
                 let mut offset = 0;
                 let members = members
                     .iter()

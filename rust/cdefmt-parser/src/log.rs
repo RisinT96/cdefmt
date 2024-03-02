@@ -10,11 +10,11 @@ use std::{collections::HashMap, fmt::Debug};
 
 use gimli::Reader;
 use object::{AddressSize, Object, ObjectSection, ReadRef};
-use regex::{Captures, Regex};
+use regex::Captures;
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
-use crate::{dwarf::UncompressedDwarf, r#type::Type, var::Var, Error, Result};
+use crate::{dwarf::Dwarf, r#type::Type, var::Var, Error, Result};
 
 #[derive(Clone, Copy, Debug, Deserialize_repr)]
 #[repr(u8)]
@@ -50,7 +50,7 @@ pub struct DataLog {
 pub struct LogParser<'data> {
     cache: HashMap<usize, Log>,
     logs_section: &'data [u8],
-    dwarf: UncompressedDwarf<'data>,
+    dwarf: Dwarf<'data>,
     address_size: AddressSize,
 }
 
@@ -59,7 +59,7 @@ impl<'data> LogParser<'data> {
         // The clone is necessary as the generation of the file  til
         // The clone here should only clone the reader, not the data.
         let file = object::File::parse(data)?;
-        let dwarf = UncompressedDwarf::new(&file)?;
+        let dwarf = Dwarf::new(&file)?;
 
         let address_size = file.architecture().address_size().unwrap();
         Ok(LogParser {
@@ -78,12 +78,9 @@ impl<'data> LogParser<'data> {
         // TODO: Make safer, maybe switch to u64 everywhere.
         let log_id = data.read_address(self.address_size.bytes())? as usize;
         let log = self.get_log(log_id)?;
-        let log_args = self.parse_log_args(&log, data)?;
+        let args = self.parse_log_args(&log, data)?;
 
-        Ok(DataLog {
-            log: log,
-            args: log_args,
-        })
+        Ok(DataLog { log, args })
     }
 
     fn get_log(&mut self, log_id: usize) -> Result<Log> {
@@ -109,7 +106,7 @@ impl<'data> LogParser<'data> {
     fn parse_log_args<R: Reader>(&self, log: &Log, mut data: R) -> Result<Vec<Var>> {
         let type_name = format!("cdefmt_log_args_t{}", log.counter);
         let ty = self.dwarf.get_type(log.file.as_str(), &type_name)?.unwrap();
-        let members = if let Type::Structure { name, mut members } = ty {
+        let members = if let Type::Structure(mut members) = ty {
             // The first member is actually the log ID, we already parsed it earlier.
             members.remove(0);
             members
