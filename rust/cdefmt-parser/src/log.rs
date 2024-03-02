@@ -3,11 +3,14 @@
 //! The logic contained within this file relates to using a log id to extract and parse the log's
 //! information from the elf.
 
+use lazy_regex::regex;
+
 use core::fmt;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use gimli::Reader;
 use object::{AddressSize, Object, ObjectSection, ReadRef};
+use regex::{Captures, Regex};
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
@@ -35,7 +38,7 @@ pub struct Log {
 #[derive(Clone, Debug)]
 pub struct DataLog {
     log: Log,
-    args: Var,
+    args: Vec<Var>,
 }
 
 pub struct LogParser<'data> {
@@ -97,16 +100,44 @@ impl<'data> LogParser<'data> {
         Ok(log)
     }
 
-    fn parse_log_args<R: Reader>(&self, log: &Log, mut data: R) -> Result<Var> {
+    fn parse_log_args<R: Reader>(&self, log: &Log, mut data: R) -> Result<Vec<Var>> {
         let type_name = format!("cdefmt_log_args_t{}", log.counter);
         let ty = self.dwarf.get_type(log.file.as_str(), &type_name)?.unwrap();
-        let ty = if let Type::Structure { name, mut members } = ty {
+        let members = if let Type::Structure { name, mut members } = ty {
             // The first member is actually the log ID, we already parsed it earlier.
             members.remove(0);
-            Type::Structure { name, members }
+            members
         } else {
             return Err(Error::Custom("Something's fucked!"));
         };
-        Var::parse(&ty, &mut data)
+
+        members
+            .iter()
+            .map(|m| Var::parse(&m.ty, &mut data))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for DataLog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pattern = regex!("\\{\\}");
+
+        let mut index = 0;
+
+        let replacer = |_: &Captures| -> String {
+            let res = format!("{:?}", self.args[index]);
+
+            index += 1;
+            index %= self.args.len();
+
+            res
+        };
+
+        let message = pattern.replace_all(&self.log.message, replacer);
+
+        // let message = pattern.replace_all(&self.log.message, |m| -> Result<String> {
+        // });
+        // self.log.message.re
+        write!(f, "{}", message)
     }
 }

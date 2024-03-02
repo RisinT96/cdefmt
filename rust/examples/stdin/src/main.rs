@@ -25,7 +25,7 @@ fn main() -> std::result::Result<(), String> {
             .collect::<Vec<_>>();
         let log = logger.parse_log(&parsed_buff);
         match log {
-            Ok(log) => println!("Log: {:#?}", log),
+            Ok(log) => println!("Log: {}", log),
             Err(e) => println!("Err: {}", e),
         }
 
