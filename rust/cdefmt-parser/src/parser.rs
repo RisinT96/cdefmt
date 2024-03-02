@@ -15,7 +15,7 @@ use crate::{
 
 /// Responsible for parsing logs from the elf.
 pub struct Parser<'data> {
-    log_cache: HashMap<usize, Log>,
+    log_cache: HashMap<usize, (LogInfo, Type)>,
     logs_section: &'data [u8],
     dwarf: Dwarf<'data>,
     address_size: AddressSize,
@@ -49,15 +49,16 @@ impl<'data> Parser<'data> {
             return Err(Error::OutOfBounds(log_id, self.logs_section.len()));
         }
 
-        if self.log_cache.contains_key(&log_id) {
-            return Ok(self.log_cache[&log_id].clone());
-        }
+        if !self.log_cache.contains_key(&log_id) {
+            let log_info = self.get_log_info(log_id)?;
+            let ty = self.parse_log_args_type(&log_info)?;
+            self.log_cache.insert(log_id, (log_info, ty));
+        };
 
-        let log_info = self.get_log_info(log_id)?;
-        let args = self.parse_log_args(&log_info, data)?;
-        let log = Log::new(log_info, args);
+        let (log_info, ty) = self.log_cache.get(&log_id).unwrap();
 
-        self.log_cache.insert(log_id, log.clone());
+        let args = self.parse_log_args(ty, data)?;
+        let log = Log::new(log_info.clone(), args);
 
         Ok(log)
     }
@@ -75,15 +76,17 @@ impl<'data> Parser<'data> {
     }
 
     // Parses the log's arguments.
-    fn parse_log_args<R: Reader>(&self, log_info: &LogInfo, mut data: R) -> Result<Vec<Var>> {
+    fn parse_log_args_type(&self, log_info: &LogInfo) -> Result<Type> {
         let type_name = format!("cdefmt_log_args_t{}", log_info.counter);
-        let ty = self.dwarf.get_type(&log_info.file, &type_name)?.unwrap();
+        self.dwarf
+            .get_type(&log_info.file, &type_name)
+            .transpose()
+            .unwrap()
+    }
 
-        let members = if let Type::Structure(mut members) = ty {
-            // Due to the way the log is constructed in the c code, the first argument is always the
-            // log id.
-            assert!(members[0].name == "log_id");
-            members.remove(0);
+    // Parses the log's arguments.
+    fn parse_log_args<R: Reader>(&self, ty: &Type, mut data: R) -> Result<Vec<Var>> {
+        let members = if let Type::Structure(members) = ty {
             members
         } else {
             return Err(Error::Custom("The log's args aren't a structure!"));
@@ -92,6 +95,9 @@ impl<'data> Parser<'data> {
         // Parse the raw data into `Var` representation.
         members
             .iter()
+            // Due to the way the log is constructed in the c code, the first argument is always the
+            // log id.
+            .skip(1)
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect()
     }
