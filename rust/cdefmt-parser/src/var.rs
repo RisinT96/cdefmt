@@ -22,9 +22,15 @@ pub enum Var {
         valid_values: BTreeMap<i128, String>,
     },
     Structure {
-        members: Vec<Var>,
+        members: Vec<StructureMember>,
     },
     Pointer(Box<Var>),
+}
+
+#[derive(Debug, Clone)]
+pub struct StructureMember {
+    pub name: String,
+    pub value: Var,
 }
 
 impl Var {
@@ -55,21 +61,26 @@ impl Var {
                 )
             }
             Type::Structure(members) => {
-                let mut offset = 0;
+                let mut total_offset = 0;
                 let members = members
                     .iter()
-                    .map(|m| -> Result<Self> {
-                        if m.offset > offset {
-                            data.skip(ReaderOffset::from_u64(m.offset - offset)?)?;
+                    .map(|m| -> Result<StructureMember> {
+                        if m.offset > total_offset {
+                            let bytes_to_skip = m.offset - total_offset;
+                            data.skip(ReaderOffset::from_u64(bytes_to_skip)?)?;
+                            total_offset += bytes_to_skip;
                         }
 
                         let (var, bytes) = Self::parse(&m.ty, data)?;
-                        offset += bytes;
+                        total_offset += bytes;
 
-                        Ok(var)
+                        Ok(StructureMember {
+                            name: m.name.clone(),
+                            value: var,
+                        })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                (Var::Structure { members }, offset)
+                (Var::Structure { members }, total_offset)
             }
             Type::Pointer(ty) => {
                 let (value, bytes) = Self::parse(ty, data)?;
@@ -114,13 +125,13 @@ impl Var {
                     .unwrap_or_else(|| value.to_string())
             }
             Var::Structure { members } => {
-                "[".to_string()
+                "{".to_string()
                     + &members
                         .iter()
-                        .map(|m| m.format())
+                        .map(|m| format!("{}: {}", m.name, m.value.format()))
                         .collect::<Vec<_>>()
                         .join(", ")
-                    + "]"
+                    + "}"
             }
             Var::Pointer(value) => value.format(),
         }
