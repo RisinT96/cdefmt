@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cdefmt-parser = { path = "../../cdefmt-parser", version = "0.1.0" }
+cdefmt-parser = { path = "../../parser", version = "0.1.0" }
 clap = { version = "4.5", features = ["derive"] }
 gimli = "0.28"
 memmap2 = "0.9"

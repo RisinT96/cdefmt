@@ -12,5 +12,7 @@ FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(MANIFEST_PATH Cargo.toml)
 
-add_subdirectory("c")
+add_library(cdefmt INTERFACE)
+target_include_directories(cdefmt INTERFACE .)
 
+add_subdirectory("examples/stdout")
