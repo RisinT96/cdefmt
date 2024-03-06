@@ -1,5 +1,6 @@
 add_executable(example-stdout
     main.c
+    linkerscript.ld
 )
 
 target_link_libraries(example-stdout
@@ -9,20 +10,17 @@ target_link_libraries(example-stdout
 
 target_link_options(example-stdout
     PRIVATE
-        -T${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
+        -T${CMAKE_CURRENT_SOURCE_DIR}/linkerscript.ld
+        -Wl,--build-id
 )
 
-add_dependencies(example-stdout linkerscript)
+target_compile_options(example-stdout
+    PRIVATE
+        -g
+)
+
 set_target_properties(example-stdout
     PROPERTIES
         LINK_DEPENDS
-            ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
-)
-
-add_custom_target(linkerscript DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld)
-add_custom_command(
-    OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/generate_linkerscript.sh
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/generate_linkerscript.sh ${CMAKE_LINKER} ${CMAKE_CURRENT_BINARY_DIR}/linkerscript.ld
-    COMMENT "Generating custom linkerscript"
+            ${CMAKE_CURRENT_SOURCE_DIR}/linkerscript.ld
 )
