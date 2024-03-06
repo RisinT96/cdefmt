@@ -180,6 +180,7 @@ fn parse_type<R: Reader>(
             gimli::DW_TAG_enumeration_type => parse_enumeration(dwarf, unit, entries),
             gimli::DW_TAG_pointer_type => parse_pointer(entry),
             gimli::DW_TAG_structure_type => parse_structure(dwarf, unit, entries),
+            gimli::DW_TAG_array_type => parse_array(dwarf, unit, entries),
             gimli::DW_TAG_const_type | gimli::DW_TAG_typedef => {
                 let type_ref = get_attribute!(entry, gimli::DW_AT_type);
 
@@ -264,6 +265,8 @@ fn parse_enumeration_storage<R: Reader>(
     if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {
         parse_type(dwarf, unit, unit_offset)
     } else {
+        // If the entry doesn't have a type attribute, try parsing it's encoding and size
+        // attributes, like a base type.
         parse_base(entry)
     }
 }
@@ -316,6 +319,79 @@ fn parse_structure<R: Reader>(
     }
 
     Ok(Type::Structure(members))
+}
+
+/// Parses the array type whose DIE is pointed to by the entries cursor.
+///
+/// Output:
+/// * Returns `Ok` if the array type DIE is successfully parsed.
+/// * Returns `Err` if an error is encountered.
+fn parse_array<R: Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    unit: &Unit<R>,
+    mut entries: EntriesCursor<'_, '_, R>,
+) -> Result<Type> {
+    let entry = entries.current().unwrap();
+    let ty =
+        if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {
+            parse_type(dwarf, unit, unit_offset)
+        } else {
+            // If the entry doesn't have a type attribute, try parsing it's encoding and size
+            // attributes, like a base type.
+            parse_base(entry)
+        }?;
+
+    let mut lengths = vec![];
+
+    // Step into member DIEs
+    if let Some((1, mut entry)) = entries.next_dfs()? {
+        // Iterate over all the siblings until there's no more.
+        loop {
+            // Get the type of the member.
+            if let Some(AttributeValue::Udata(count)) = entry.attr_value(gimli::DW_AT_count)? {
+                lengths.push(count);
+                continue;
+            }
+
+            let lower_bound = if let Some(AttributeValue::Udata(lower_bound)) =
+                entry.attr_value(gimli::DW_AT_lower_bound)?
+            {
+                lower_bound
+            } else {
+                0
+            };
+
+            let upper_bound = if let Some(value) = entry.attr_value(gimli::DW_AT_upper_bound)? {
+                // Size of array is upper bound + 1 - lower_bound
+                match value {
+                    AttributeValue::Data1(value) => value as u64 + 1,
+                    AttributeValue::Data2(value) => value as u64 + 1,
+                    AttributeValue::Data4(value) => value as u64 + 1,
+                    AttributeValue::Data8(value) => value + 1,
+                    AttributeValue::Udata(value) => value + 1,
+                    // Zero sized array
+                    AttributeValue::Sdata(-1) => 0,
+                    _ => return Err(Error::BadAttribute),
+                }
+            } else {
+                return Err(Error::Custom("Missing array upper bound!"));
+            };
+
+            lengths.push(upper_bound - lower_bound);
+
+            // Get next sibling or break iteration.
+            entry = if let Some(e) = entries.next_sibling()? {
+                e
+            } else {
+                break;
+            };
+        }
+    }
+
+    Ok(Type::Array {
+        ty: Box::new(ty),
+        lengths,
+    })
 }
 
 /// Parses a base type DIE

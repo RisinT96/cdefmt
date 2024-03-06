@@ -41,13 +41,13 @@ typedef enum signed_enum {
 
 int main(int argc, char* cargv[]) {
   // Different log levels:
-  // CDEFMT_ERROR("This is an error log.");
-  // CDEFMT_WARNING("This is a warning log.");
-  // CDEFMT_INFO("This is an info log.");
-  // CDEFMT_DEBUG("This is a debug log.");
-  // CDEFMT_VERBOSE("This is a verbose log.");
+  CDEFMT_ERROR("This is an error log.");
+  CDEFMT_WARNING("This is a warning log.");
+  CDEFMT_INFO("This is an info log.");
+  CDEFMT_DEBUG("This is a debug log.");
+  CDEFMT_VERBOSE("This is a verbose log.");
 
-  // Different arguments
+  // Different types
   bool some_bool = true;
   uint8_t some_u8 = 123;
   uint16_t some_u16 = 12345;
@@ -59,6 +59,20 @@ int main(int argc, char* cargv[]) {
   int64_t some_i64 = -1234567890123456789;
   float some_f32 = 123.4567890f;
   double some_f64 = 123.4567890;
+
+  CDEFMT_INFO("bool: [{}]", some_bool);
+  CDEFMT_INFO("u8:   [{}]", some_u8);
+  CDEFMT_INFO("u16:  [{}]", some_u16);
+  CDEFMT_INFO("u32:  [{}]", some_u32);
+  CDEFMT_INFO("u64:  [{}]", some_u64);
+  CDEFMT_INFO("i8:   [{}]", some_i8);
+  CDEFMT_INFO("i16:  [{}]", some_i16);
+  CDEFMT_INFO("i32:  [{}]", some_i32);
+  CDEFMT_INFO("i64:  [{}]", some_i64);
+  CDEFMT_INFO("f32:  [{}]", some_f32);
+  CDEFMT_INFO("f64:  [{}]", some_f64);
+
+  // Different structs
   some_struct_t some_struct_typedefd = {
       .a = 1234567890123456789,
       .b = 1234567890,
@@ -89,49 +103,46 @@ int main(int argc, char* cargv[]) {
       .b = 1234567890,
       .c = 1234567890123456789,
   };
-  enum unsigned_enum some_unsigned_enum = UNSIGNED_ENUM_5;
-  enum signed_enum some_signed_enum = SIGNED_ENUM_5;
-  enum unsigned_enum other_unsigned_enum = UNSIGNED_ENUM_3;
-  enum signed_enum other_signed_enum = SIGNED_ENUM_3;
 
-  CDEFMT_INFO("bool: [{}]", some_bool);
-  CDEFMT_INFO("u8:   [{}]", some_u8);
-  CDEFMT_INFO("u16:  [{}]", some_u16);
-  CDEFMT_INFO("u32:  [{}]", some_u32);
-  CDEFMT_INFO("u64:  [{}]", some_u64);
-  CDEFMT_INFO("i8:   [{}]", some_i8);
-  CDEFMT_INFO("i16:  [{}]", some_i16);
-  CDEFMT_INFO("i32:  [{}]", some_i32);
-  CDEFMT_INFO("i64:  [{}]", some_i64);
-  CDEFMT_INFO("f32:  [{}]", some_f32);
-  CDEFMT_INFO("f64:  [{}]", some_f64);
   CDEFMT_INFO("some struct typedef'd:        {}", some_struct_typedefd);
   CDEFMT_INFO("some struct:                  {}", some_struct);
   CDEFMT_INFO("some padded struct typedef'd: {}", some_padded_struct_typedefd);
   CDEFMT_INFO("some padded struct:           {}", some_padded_struct);
   CDEFMT_INFO("some packed struct typedef'd: {}", some_packed_struct_typedefd);
   CDEFMT_INFO("some packed struct:           {}", some_packed_struct);
+
+  // Different enums
+  enum unsigned_enum some_unsigned_enum = UNSIGNED_ENUM_5;
+  enum signed_enum some_signed_enum = SIGNED_ENUM_5;
+  enum unsigned_enum other_unsigned_enum = UNSIGNED_ENUM_3;
+  enum signed_enum other_signed_enum = SIGNED_ENUM_3;
   CDEFMT_INFO("some unsigned enum:        [{}]", some_unsigned_enum);
   CDEFMT_INFO("other unsigned enum:       [{}]", other_unsigned_enum);
-  CDEFMT_INFO("some unsigned enum direct: [{}]", UNSIGNED_ENUM_5);
   CDEFMT_INFO("some signed enum:          [{}]", some_signed_enum);
   CDEFMT_INFO("other signed enum:         [{}]", other_signed_enum);
-  CDEFMT_INFO("some signed enum direct:   [{}]", SIGNED_ENUM_5);
+
+  // Arrays
+  uint8_t u8_array[] = {1};
+  CDEFMT_INFO("u8 array: {}", u8_array);
 
   // Up to 8 arguments
   CDEFMT_INFO("no args []");
-  CDEFMT_INFO("1 arg:  [{}]", 1);
-  CDEFMT_INFO("2 args: [{}, {}]", 1, 2);
-  CDEFMT_INFO("3 args: [{}, {}, {}]", 1, 2, 3);
-  CDEFMT_INFO("4 args: [{}, {}, {}, {}]", 1, 2, 3, 4);
-  CDEFMT_INFO("5 args: [{}, {}, {}, {}, {}]", 1, 2, 3, 4, 5);
-  CDEFMT_INFO("6 args: [{}, {}, {}, {}, {}, {}]", 1, 2, 3, 4, 5, 6);
-  CDEFMT_INFO("7 args: [{}, {}, {}, {}, {}, {}, {}]", 1, 2, 3, 4, 5, 6, 7);
-  CDEFMT_INFO("8 args: [{}, {}, {}, {}, {}, {}, {}, {}]", 1, 2, 3, 4, 5, 6, 7, 8);
+  CDEFMT_INFO("1 arg:  [{}]", some_bool);
+  CDEFMT_INFO("2 args: [{}, {}]", some_bool, some_i8);
+  CDEFMT_INFO("3 args: [{}, {}, {}]", some_bool, some_i8, some_u8);
+  CDEFMT_INFO("4 args: [{}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32);
+  CDEFMT_INFO("5 args: [{}, {}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32, some_f64);
+  CDEFMT_INFO("6 args: [{}, {}, {}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32, some_f64,
+              some_packed_struct);
+  CDEFMT_INFO("7 args: [{}, {}, {}, {}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32,
+              some_f64, some_packed_struct, some_i64);
+  CDEFMT_INFO("8 args: [{}, {}, {}, {}, {}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32,
+              some_f64, some_packed_struct, some_i64, some_unsigned_enum);
 
   // Handle user error
   CDEFMT_INFO("HAHA I LIED! gave you no args at all! [{}, {}, {}, {}]");
-  CDEFMT_INFO("HAHA I LIED! gave you less args than in format string! [{}, {}, {}, {}]", 1, 2, 3);
+  CDEFMT_INFO("HAHA I LIED! gave you less args than in format string! [{}, {}, {}, {}]", some_bool,
+              some_signed_enum, u8_array);
 
   // Of course can print same log with different values.
   for (size_t i = 0; i < 10; i++) {

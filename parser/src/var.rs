@@ -25,6 +25,7 @@ pub enum Var {
         members: Vec<StructureMember>,
     },
     Pointer(Box<Var>),
+    Array(Vec<Var>),
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +87,17 @@ impl Var {
                 let (value, bytes) = Self::parse(ty, data)?;
                 (Var::Pointer(Box::new(value)), bytes)
             }
+            Type::Array { ty, lengths } => {
+                let l = lengths[0];
+
+                let mut values = Vec::with_capacity(l as usize);
+                for _ in 0..l {
+                    let (val, _) = Self::parse(ty, data)?;
+                    values.push(val);
+                }
+
+                (Var::Array(values), 0)
+            }
         })
     }
 
@@ -134,6 +146,15 @@ impl Var {
                     + "}"
             }
             Var::Pointer(value) => value.format(),
+            Var::Array(values) => {
+                "[".to_string()
+                    + &values
+                        .iter()
+                        .map(Self::format)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                    + "]"
+            }
         }
     }
 }

@@ -22,6 +22,10 @@ pub enum Type {
     },
     Structure(Vec<StructureMember>),
     Pointer(Box<Type>),
+    Array {
+        ty: Box<Type>,
+        lengths: Vec<u64>,
+    },
 }
 
 #[derive(Debug, Clone)]
