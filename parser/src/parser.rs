@@ -17,6 +17,7 @@ use crate::{
 pub struct Parser<'data> {
     log_cache: HashMap<usize, (LogInfo, Type)>,
     logs_section: &'data [u8],
+    build_id: &'data [u8],
     dwarf: Dwarf<'data>,
     address_size: AddressSize,
 }
@@ -26,6 +27,7 @@ impl<'data> Parser<'data> {
     pub fn new<R: ReadRef<'data>>(data: R) -> Result<Self> {
         let file = object::File::parse(data)?;
         let dwarf = Dwarf::new(&file)?;
+        let build_id = file.build_id()?.unwrap();
 
         let address_size = file.architecture().address_size().unwrap();
         Ok(Parser {
@@ -34,6 +36,7 @@ impl<'data> Parser<'data> {
                 .section_by_name(".cdefmt")
                 .ok_or(Error::MissingSection)?
                 .data()?,
+            build_id,
             dwarf,
             address_size,
         })
@@ -60,6 +63,10 @@ impl<'data> Parser<'data> {
         let args = self.parse_log_args(ty, data)?;
         let log = Log::new(log_info.clone(), args);
 
+        if log_id == 0 {
+            self.validate_init(&log)?
+        }
+
         Ok(log)
     }
 
@@ -70,7 +77,8 @@ impl<'data> Parser<'data> {
             .next()
             .ok_or(Error::NoNullTerm)?;
         let log = std::str::from_utf8(log).map_err(|e| Error::Utf8(log_id, e))?;
-        let log: LogInfo = serde_json::from_str(log)?;
+        let mut log: LogInfo = serde_json::from_str(log)?;
+        log.id = log_id;
 
         Ok(log)
     }
@@ -96,9 +104,29 @@ impl<'data> Parser<'data> {
         members
             .iter()
             // Due to the way the log is constructed in the c code, the first argument is always the
-            // log id.
+            // log id, we already have it.
             .skip(1)
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect()
+    }
+
+    fn validate_init(&self, log: &Log) -> Result<()> {
+        let args = log.get_args();
+        if let Some(Var::Array(build_id)) = args.get(0) {
+            let build_id = build_id
+                .iter()
+                .map(|b| match b {
+                    Var::U8(b) => Ok(*b),
+                    _ => Err(Error::Custom("Build ID data contains non u8 element!")),
+                })
+                .collect::<Result<Vec<_>>>()?;
+            if self.build_id != build_id {
+                Err(Error::Custom("Build ID mismatch!"))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(Error::Custom("Build ID missing or not an array"))
+        }
     }
 }

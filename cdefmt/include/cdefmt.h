@@ -2,6 +2,7 @@
 #define CDEFMT_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /* Inner mechanisms */
@@ -28,10 +29,30 @@ enum cdefmt_level {
 #define CDEFMT_DEBUG(...)   __CDEFMT_LOG(__CDEFMT_LEVEL_DBG, __VA_ARGS__)
 #define CDEFMT_VERBOSE(...) __CDEFMT_LOG(__CDEFMT_LEVEL_VRB, __VA_ARGS__)
 
+static inline int cdefmt_init();
+
+#define CDEFMT_GENERATE_INIT()                                     \
+  static inline int cdefmt_init() {                                \
+    extern const struct cdefmt_build_id __cdefmt_build_id;         \
+    if (__cdefmt_build_id.type != NT_GNU_BUILD_ID) {               \
+      return -1;                                                   \
+    }                                                              \
+                                                                   \
+    if (__cdefmt_build_id.data_size != CDEFMT_GNU_BUILD_ID_SIZE) { \
+      return -2;                                                   \
+    };                                                             \
+                                                                   \
+    __CDEFMT_INIT(__COUNTER__);                                    \
+                                                                   \
+    return 0;                                                      \
+  }
+
 /* Implement me */
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* Inner mechanisms */
+
+#define CDEFMT_GNU_BUILD_ID_SIZE 20
 
 /* Returns the 64th argument */
 #define CDEFMT_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, \
@@ -85,9 +106,9 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   CDEFMT_OVERLOAD(__CDEFMT_LOG, __VA_ARGS__) \
   (__COUNTER__, level_, __FILE__, __LINE__, __VA_ARGS__)
 
-#define __CDEFMT_ASSIGN(to_, from_)          \
-  do {                                       \
-    memcpy((&to_), &(from_), sizeof(from_)); \
+#define CDEFMT_ASSIGN(to_, from_)          \
+  do {                                     \
+    memcpy((&to_), &(from_), sizeof(to_)); \
   } while (0)
 
 /* Log with 0 arguments */
@@ -117,7 +138,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
         .log_id = CDEFMT_LOG_STRING(counter_),                                         \
     };                                                                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                            \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                              \
                                                                                        \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
@@ -135,8 +156,8 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
         .log_id = CDEFMT_LOG_STRING(counter_),                                         \
     };                                                                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                            \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                            \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                              \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                              \
                                                                                        \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
@@ -155,9 +176,9 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                   \
         .log_id = CDEFMT_LOG_STRING(counter_),                                         \
     };                                                                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                            \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                            \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                            \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                              \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                              \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                              \
                                                                                        \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_); \
   } while (0)
@@ -177,10 +198,10 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                        \
         .log_id = CDEFMT_LOG_STRING(counter_),                                              \
     };                                                                                      \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                 \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                 \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                   \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                   \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                   \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                   \
                                                                                             \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);      \
   } while (0)
@@ -201,11 +222,11 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                               \
         .log_id = CDEFMT_LOG_STRING(counter_),                                                     \
     };                                                                                             \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                        \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                          \
                                                                                                    \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);             \
   } while (0)
@@ -229,12 +250,12 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
         .log_id = CDEFMT_LOG_STRING(counter_),                                                     \
         .arg1 = arg1_,                                                                             \
     };                                                                                             \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                        \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                          \
                                                                                                    \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);             \
   } while (0)
@@ -258,13 +279,13 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                               \
         .log_id = CDEFMT_LOG_STRING(counter_),                                                     \
     };                                                                                             \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg7, arg7_);                                        \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg7, arg7_);                                          \
                                                                                                    \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);             \
   } while (0)
@@ -289,16 +310,46 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                               \
         .log_id = CDEFMT_LOG_STRING(counter_),                                                     \
     };                                                                                             \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg7, arg7_);                                        \
-    __CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg8, arg8_);                                        \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg1, arg1_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg2, arg2_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg3, arg3_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg4, arg4_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg5, arg5_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg6, arg6_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg7, arg7_);                                          \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).arg8, arg8_);                                          \
                                                                                                    \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), level_);             \
+  } while (0)
+
+struct cdefmt_build_id {
+  uint32_t name_size;
+  uint32_t data_size;
+  uint32_t type;
+  uint8_t data[];
+};
+
+#ifndef NT_GNU_BUILD_ID
+#define NT_GNU_BUILD_ID 3
+#endif
+
+#define __CDEFMT_INIT(counter_)                                                                    \
+  do {                                                                                             \
+    const static __attribute__((section(".cdefmt.init"))) char CDEFMT_LOG_STRING(counter_)[] =     \
+        CDEFMT_FORMAT_MESSAGE(counter_, __CDEFMT_LEVEL_ERR, __FILE__, 0, "cdefmt init: {}");       \
+                                                                                                   \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
+      const char* log_id;                                                                          \
+      unsigned char build_id[CDEFMT_GNU_BUILD_ID_SIZE];                                            \
+    };                                                                                             \
+                                                                                                   \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                               \
+        .log_id = CDEFMT_LOG_STRING(counter_),                                                     \
+    };                                                                                             \
+    CDEFMT_ASSIGN(CDEFMT_LOG_ARGS(counter_).build_id,                                              \
+                  __cdefmt_build_id.data[__cdefmt_build_id.name_size]);                            \
+                                                                                                   \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), __CDEFMT_LEVEL_ERR); \
   } while (0)
 
 #endif /* CDEFMT_H */

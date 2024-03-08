@@ -27,7 +27,10 @@ SECTIONS
 {
   PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x400000)); . = SEGMENT_START("text-segment", 0x400000) + SIZEOF_HEADERS;
   .interp         : { *(.interp) }
-  .note.gnu.build-id  : { *(.note.gnu.build-id) }
+  .note.gnu.build-id : {
+    PROVIDE(__cdefmt_build_id = .);
+    *(.note.gnu.build-id)
+  }
   .hash           : { *(.hash) }
   .gnu.hash       : { *(.gnu.hash) }
   .dynsym         : { *(.dynsym) }

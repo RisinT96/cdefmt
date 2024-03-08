@@ -39,7 +39,13 @@ typedef enum signed_enum {
   SIGNED_ENUM_5 = INT16_MIN,
 } signed_enum_t;
 
+CDEFMT_GENERATE_INIT()
+
 int main(int argc, char* cargv[]) {
+  if (cdefmt_init()) {
+    return 1;
+  }
+
   // Different log levels:
   CDEFMT_ERROR("This is an error log.");
   CDEFMT_WARNING("This is a warning log.");
@@ -122,7 +128,7 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("other signed enum:         [{}]", other_signed_enum);
 
   // Arrays
-  uint8_t u8_array[] = {1};
+  uint8_t u8_array[] = {1, 2, 3, 4, 5};
   CDEFMT_INFO("u8 array: {}", u8_array);
 
   // Up to 8 arguments

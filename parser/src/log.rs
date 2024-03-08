@@ -31,6 +31,8 @@ impl fmt::Display for Level {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct LogInfo {
+    #[serde(skip)]
+    pub id: usize,
     pub counter: usize,
     pub level: Level,
     pub file: String,
@@ -59,6 +61,10 @@ impl Log {
 
     pub fn get_line(&self) -> usize {
         self.log_info.line
+    }
+
+    pub fn get_args(&self) -> &[Var] {
+        &self.args
     }
 }
 
