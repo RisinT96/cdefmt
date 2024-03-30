@@ -140,22 +140,44 @@ fn find_type_die<R: Reader>(
     compilation_unit: &Unit<R>,
     type_name: &str,
 ) -> Result<Option<UnitOffset<R::Offset>>> {
-    // Iterate over the Debugging Information Entries (DIEs) in the unit.
     let mut entries = compilation_unit.entries();
-    while let Some((_, entry)) = entries.next_dfs()? {
-        // Check each DIE's name.
-        if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
-            let name = dwarf.attr_string(compilation_unit, name_attribute)?;
-            let name = name.to_string()?;
 
-            if name == type_name {
-                // Found our DIE.
-                return Ok(Some(entry.offset()));
+    // Get entries to point to the compilation unit.
+    some!(entries.next_dfs()?);
+
+    // Actually step into the compilation unit.
+    some!(entries.next_dfs()?);
+
+    loop {
+        let entry = entries.current().unwrap();
+
+        match entry.tag() {
+            // Check structure name, continue to next sibling if there's no match.
+            gimli::DW_TAG_structure_type => {
+                if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
+                    let name = dwarf.attr_string(compilation_unit, name_attribute)?;
+                    let name = name.to_string()?;
+
+                    if name == type_name {
+                        // Found our DIE.
+                        return Ok(Some(entry.offset()));
+                    }
+
+                    some!(entries.next_sibling()?);
+                }
+            }
+            // Continue to next entry (dfs).
+            gimli::DW_TAG_subprogram | gimli::DW_TAG_lexical_block => {
+                some!(entries.next_dfs()?);
+            }
+            // Continue to next sibling, if there's no sibling, go up.
+            _ => {
+                if entries.next_sibling()?.is_none() {
+                    some!(entries.next_dfs()?);
+                }
             }
         }
     }
-
-    Ok(None)
 }
 
 /// Parses the type whose description starts at the provided offset.
