@@ -15,6 +15,9 @@
 
 /* User API */
 
+static inline int cdefmt_init();
+#define CDEFMT_GENERATE_INIT() __CDEFMT_GENERATE_INIT()
+
 enum cdefmt_level {
   CDEFMT_LEVEL_ERR = __CDEFMT_LEVEL_ERR,
   CDEFMT_LEVEL_WRN = __CDEFMT_LEVEL_WRN,
@@ -29,29 +32,12 @@ enum cdefmt_level {
 #define CDEFMT_DEBUG(...)   __CDEFMT_LOG(__CDEFMT_LEVEL_DBG, __VA_ARGS__)
 #define CDEFMT_VERBOSE(...) __CDEFMT_LOG(__CDEFMT_LEVEL_VRB, __VA_ARGS__)
 
-static inline int cdefmt_init();
-
-#define CDEFMT_GENERATE_INIT()                                     \
-  static inline int cdefmt_init() {                                \
-    extern const struct cdefmt_build_id __cdefmt_build_id;         \
-    if (__cdefmt_build_id.type != NT_GNU_BUILD_ID) {               \
-      return -1;                                                   \
-    }                                                              \
-                                                                   \
-    if (__cdefmt_build_id.data_size != CDEFMT_GNU_BUILD_ID_SIZE) { \
-      return -2;                                                   \
-    };                                                             \
-                                                                   \
-    __CDEFMT_INIT(__COUNTER__);                                    \
-                                                                   \
-    return 0;                                                      \
-  }
-
 /* Implement me */
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* Inner mechanisms */
 
+#define CDEFMT_SCHEMA            1
 #define CDEFMT_GNU_BUILD_ID_SIZE 20
 
 /* Returns the 64th argument */
@@ -89,11 +75,14 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_LOG_ARGS(counter_)   CDEFMT_CONCAT(cdefmt_log_args, counter_)
 
 #define CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_) \
-  "{\"counter\":"CDEFMT_STRINGIFY(counter_)"," \
-  "\"level\":"CDEFMT_STRINGIFY(level_)"," \
-  "\"file\":\""file_"\"," \
-  "\"line\":"CDEFMT_STRINGIFY(line_)"," \
-  "\"message\":\""message_"\"}"
+  "{"                                                                   \
+  "\"schema\":"CDEFMT_STRINGIFY(CDEFMT_SCHEMA)","                       \
+  "\"counter\":"CDEFMT_STRINGIFY(counter_)","                           \
+  "\"level\":"CDEFMT_STRINGIFY(level_)","                               \
+  "\"file\":\""file_"\","                                               \
+  "\"line\":"CDEFMT_STRINGIFY(line_)","                                 \
+  "\"message\":\""message_"\""                                          \
+  "}"
 
 #define CDEFMT_GENERATE_MESSAGE(counter_, level_, file_, line_, message_)               \
   const static __attribute__((section(".cdefmt"))) char CDEFMT_LOG_STRING(counter_)[] = \
@@ -351,5 +340,21 @@ struct cdefmt_build_id {
                                                                                                    \
     cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), __CDEFMT_LEVEL_ERR); \
   } while (0)
+
+#define __CDEFMT_GENERATE_INIT()                                   \
+  static inline int cdefmt_init() {                                \
+    extern const struct cdefmt_build_id __cdefmt_build_id;         \
+    if (__cdefmt_build_id.type != NT_GNU_BUILD_ID) {               \
+      return -1;                                                   \
+    }                                                              \
+                                                                   \
+    if (__cdefmt_build_id.data_size != CDEFMT_GNU_BUILD_ID_SIZE) { \
+      return -2;                                                   \
+    };                                                             \
+                                                                   \
+    __CDEFMT_INIT(__COUNTER__);                                    \
+                                                                   \
+    return 0;                                                      \
+  }
 
 #endif /* CDEFMT_H */

@@ -7,7 +7,7 @@ use object::{AddressSize, Object, ObjectSection, ReadRef};
 
 use crate::{
     dwarf::Dwarf,
-    log::{Log, LogInfo},
+    log::{Log, MetadataV1, Schema},
     r#type::Type,
     var::Var,
     Error, Result,
@@ -15,7 +15,7 @@ use crate::{
 
 /// Responsible for parsing logs from the elf.
 pub struct Parser<'data> {
-    log_cache: HashMap<usize, (LogInfo, Type)>,
+    log_cache: HashMap<usize, (MetadataV1, Type)>,
     logs_section: &'data [u8],
     build_id: &'data [u8],
     dwarf: Dwarf<'data>,
@@ -53,15 +53,15 @@ impl<'data> Parser<'data> {
         }
 
         if !self.log_cache.contains_key(&log_id) {
-            let log_info = self.get_log_info(log_id)?;
+            let log_info = self.parse_log_metadata(log_id)?;
             let ty = self.parse_log_args_type(&log_info)?;
             self.log_cache.insert(log_id, (log_info, ty));
         };
 
-        let (log_info, ty) = self.log_cache.get(&log_id).unwrap();
+        let (metadata, ty) = self.log_cache.get(&log_id).unwrap();
 
         let args = self.parse_log_args(ty, data)?;
-        let log = Log::new(log_info.clone(), args);
+        let log = Log::new(metadata.clone(), args);
 
         if log_id == 0 {
             self.validate_init(&log)?
@@ -71,23 +71,29 @@ impl<'data> Parser<'data> {
     }
 
     // Parses the log's static information.
-    fn get_log_info(&self, log_id: usize) -> Result<LogInfo> {
-        let log = &self.logs_section[log_id..]
+    fn parse_log_metadata(&self, log_id: usize) -> Result<MetadataV1> {
+        let json = &self.logs_section[log_id..]
             .split(|b| *b == 0)
             .next()
             .ok_or(Error::NoNullTerm)?;
-        let log = std::str::from_utf8(log).map_err(|e| Error::Utf8(log_id, e))?;
-        let mut log: LogInfo = serde_json::from_str(log)?;
-        log.id = log_id;
+        let json = std::str::from_utf8(json).map_err(|e| Error::Utf8(log_id, e))?;
+        let schema: Schema = serde_json::from_str(json)?;
 
-        Ok(log)
+        let mut metadata = match schema.schema {
+            1 => serde_json::from_str::<MetadataV1>(json),
+            _ => return Err(Error::Schema(schema.schema)),
+        }?;
+
+        metadata.id = log_id;
+
+        Ok(metadata)
     }
 
     // Parses the log's arguments.
-    fn parse_log_args_type(&self, log_info: &LogInfo) -> Result<Type> {
-        let type_name = format!("cdefmt_log_args_t{}", log_info.counter);
+    fn parse_log_args_type(&self, metadata: &MetadataV1) -> Result<Type> {
+        let type_name = format!("cdefmt_log_args_t{}", metadata.counter);
         self.dwarf
-            .get_type(&log_info.file, &type_name)
+            .get_type(&metadata.file, &type_name)
             .transpose()
             .unwrap()
     }

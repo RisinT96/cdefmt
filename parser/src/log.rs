@@ -30,7 +30,12 @@ impl fmt::Display for Level {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub(crate) struct LogInfo {
+pub(crate) struct Schema {
+    pub schema: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct MetadataV1 {
     #[serde(skip)]
     pub id: usize,
     pub counter: usize,
@@ -42,25 +47,25 @@ pub(crate) struct LogInfo {
 
 #[derive(Clone, Debug)]
 pub struct Log {
-    log_info: LogInfo,
+    metadata: MetadataV1,
     args: Vec<Var>,
 }
 
 impl Log {
-    pub(crate) fn new(log_info: LogInfo, args: Vec<Var>) -> Self {
-        Self { log_info, args }
+    pub(crate) fn new(metadata: MetadataV1, args: Vec<Var>) -> Self {
+        Self { metadata, args }
     }
 
     pub fn get_level(&self) -> Level {
-        self.log_info.level
+        self.metadata.level
     }
 
     pub fn get_file(&self) -> &str {
-        &self.log_info.file
+        &self.metadata.file
     }
 
     pub fn get_line(&self) -> usize {
-        self.log_info.line
+        self.metadata.line
     }
 
     pub fn get_args(&self) -> &[Var] {
@@ -86,7 +91,7 @@ impl std::fmt::Display for Log {
             }
         };
 
-        let message = pattern.replace_all(&self.log_info.message, replacer);
+        let message = pattern.replace_all(&self.metadata.message, replacer);
 
         write!(f, "{}", message)
     }

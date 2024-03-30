@@ -43,6 +43,8 @@ pub enum Error {
     BadAttribute,
     #[error("There is no DIE at the given offset: {0}")]
     NoDIE(u64),
+    #[error("Unsupported schema version: {0}")]
+    Schema(u32),
     #[error("{0}")]
     Custom(&'static str),
 }
