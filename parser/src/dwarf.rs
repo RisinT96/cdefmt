@@ -16,6 +16,15 @@ macro_rules! get_attribute {
     };
 }
 
+macro_rules! some {
+    ($expr:expr) => {
+        match $expr {
+            Some(it) => it,
+            None => return Ok(None),
+        }
+    };
+}
+
 /// Contains an uncompressed dwarf and it's endianness.
 #[derive(Debug)]
 pub(crate) struct Dwarf<'data> {
@@ -67,18 +76,8 @@ impl<'data> Dwarf<'data> {
         type_name: &str,
     ) -> Result<Option<Type>> {
         let dwarf = self.borrow();
-        let compilation_unit =
-            if let Some(c) = find_compilation_unit(&dwarf, compilation_unit_name)? {
-                c
-            } else {
-                return Ok(None);
-            };
-
-        let unit_offset = if let Some(c) = find_type_die(&dwarf, &compilation_unit, type_name)? {
-            c
-        } else {
-            return Ok(None);
-        };
+        let compilation_unit = some!(find_compilation_unit(&dwarf, compilation_unit_name)?);
+        let unit_offset = some!(find_type_die(&dwarf, &compilation_unit, type_name)?);
 
         parse_type(&dwarf, &compilation_unit, unit_offset).map(Some)
     }
@@ -225,11 +224,15 @@ fn parse_enumeration<R: Reader>(
                 Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
                     .attr_value(gimli::DW_AT_const_value)?
                     .and_then(|o| o.sdata_value())
+                    // Unwrap safety: DW_AT_const_value of enum whose underlying type is a signed
+                    // integer must contain signed data.
                     .unwrap()
                     as i128,
                 Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
                     .attr_value(gimli::DW_AT_const_value)?
                     .and_then(|o| o.udata_value())
+                    // Unwrap safety: DW_AT_const_value of enum whose underlying type is an unsigned
+                    // integer must contain unsigned data.
                     .unwrap()
                     as i128,
                 _ => unreachable!("C enums must have integer types!"),
@@ -331,6 +334,7 @@ fn parse_array<R: Reader>(
     unit: &Unit<R>,
     mut entries: EntriesCursor<'_, '_, R>,
 ) -> Result<Type> {
+    // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
     let entry = entries.current().unwrap();
     let ty =
         if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {

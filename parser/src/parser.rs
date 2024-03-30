@@ -27,9 +27,14 @@ impl<'data> Parser<'data> {
     pub fn new<R: ReadRef<'data>>(data: R) -> Result<Self> {
         let file = object::File::parse(data)?;
         let dwarf = Dwarf::new(&file)?;
-        let build_id = file.build_id()?.unwrap();
+        let build_id = file
+            .build_id()?
+            .ok_or(Error::Custom("Unable to find build ID in elf!"))?;
 
-        let address_size = file.architecture().address_size().unwrap();
+        let address_size = file.architecture().address_size().ok_or(Error::Custom(
+            "Unsupported architecture, no address size information!",
+        ))?;
+
         Ok(Parser {
             log_cache: Default::default(),
             logs_section: file
@@ -53,11 +58,13 @@ impl<'data> Parser<'data> {
         }
 
         if !self.log_cache.contains_key(&log_id) {
+            // Parse log metadata and type if we don't have it cached.
             let log_info = self.parse_log_metadata(log_id)?;
             let ty = self.parse_log_args_type(&log_info)?;
             self.log_cache.insert(log_id, (log_info, ty));
         };
 
+        // Unwrap safety: made sure that the entry exists right above here.
         let (metadata, ty) = self.log_cache.get(&log_id).unwrap();
 
         let args = self.parse_log_args(ty, data)?;
@@ -93,9 +100,8 @@ impl<'data> Parser<'data> {
     fn parse_log_args_type(&self, metadata: &MetadataV1) -> Result<Type> {
         let type_name = format!("cdefmt_log_args_t{}", metadata.counter);
         self.dwarf
-            .get_type(&metadata.file, &type_name)
-            .transpose()
-            .unwrap()
+            .get_type(&metadata.file, &type_name)?
+            .ok_or_else(|| Error::Custom("Unable to find arguments type information!"))
     }
 
     // Parses the log's arguments.
