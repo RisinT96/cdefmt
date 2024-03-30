@@ -118,7 +118,7 @@ impl<'data> Parser<'data> {
 
     fn validate_init(&self, log: &Log) -> Result<()> {
         let args = log.get_args();
-        if let Some(Var::Array(build_id)) = args.get(0) {
+        if let Some(Var::Array(build_id)) = args.first() {
             let build_id = build_id
                 .iter()
                 .map(|b| match b {
