@@ -32,7 +32,16 @@ enum cdefmt_level {
 #define CDEFMT_DEBUG(...)   __CDEFMT_LOG(__CDEFMT_LEVEL_DBG, __VA_ARGS__)
 #define CDEFMT_VERBOSE(...) __CDEFMT_LOG(__CDEFMT_LEVEL_VRB, __VA_ARGS__)
 
-/* Implement me */
+/**
+ * cdefmt_log() - Log sink for all logs printed by cdefmt.
+ *                Has to be implemented by the library's user.
+ * @log:   pointer to the log object.
+ * @size:  the size of the log object.
+ * @level: the log's level.
+ *
+ * This function can filter the logs at runtime based on the `level`.
+ * The implementation has to write the `log` into the log backends used by the project.
+ */
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* Inner mechanisms */
