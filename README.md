@@ -47,5 +47,17 @@ See:
 *   [stdout](examples/stdout/) for generating logs.
 *   [stdin](examples/stdin/) for parsing the logs.
 
+The easiest way to run the example would be to build the project using cmake:
+```bash
+cmake -S . -B build
+cmake --build build/
+```
+
+Then run the stdout example and pipe it's stdout into the stdin example:
+
+```bash
+build/debug/examples/stdout/example-stdout | build/debug/stdin --elf build/debug/examples/stdout/example-stdout
+```
+
 # License
 *   MIT license ([LICENSE](LICENSE) or http://opensource.org/licenses/MIT)
