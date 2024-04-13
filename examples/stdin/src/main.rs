@@ -23,6 +23,7 @@ fn main() -> std::result::Result<(), String> {
     let mut logger = cdefmt_parser::Parser::new(&*mmap).map_err(|e| e.to_string())?;
 
     let stdin = std::io::stdin();
+
     let mut buff = Default::default();
 
     while let Ok(s) = stdin.read_line(&mut buff) {
