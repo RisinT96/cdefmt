@@ -53,6 +53,9 @@ int main(int argc, char* cargv[]) {
   CDEFMT_DEBUG("This is a debug log.");
   CDEFMT_VERBOSE("This is a verbose log.");
 
+  CDEFMT_INFO("Escaped braces {{ }} } {{{{");
+  CDEFMT_INFO("No closing brace { some text");
+
   // Different types
   bool some_bool = true;
   uint8_t some_u8 = 123;
