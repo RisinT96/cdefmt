@@ -42,7 +42,8 @@ pub(crate) struct MetadataV1 {
     pub level: Level,
     pub file: String,
     pub line: usize,
-    pub message: String,
+    #[serde(rename = "message")]
+    pub format_string: String,
 }
 
 #[derive(Clone, Debug)]
@@ -91,7 +92,7 @@ impl std::fmt::Display for Log {
             }
         };
 
-        let message = pattern.replace_all(&self.metadata.message, replacer);
+        let message = pattern.replace_all(&self.metadata.format_string, replacer);
 
         write!(f, "{}", message)
     }
