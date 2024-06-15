@@ -3,6 +3,7 @@ use gimli::{DwAte, DwTag, SectionId};
 mod dwarf;
 mod r#type;
 
+pub mod format;
 pub mod log;
 pub mod parser;
 pub mod var;

@@ -8,7 +8,10 @@ use core::fmt;
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 
-use crate::{var::Var, Error};
+use crate::{
+    format::{FormatStringFragment, FormatStringFragmentIterator, ParameterPosition},
+    var::Var,
+};
 
 #[derive(Clone, Copy, Debug, Deserialize_repr)]
 #[repr(u8)]
@@ -49,74 +52,6 @@ pub struct Log {
     args: Vec<Var>,
 }
 
-enum FormatStringFragment<'s> {
-    Argument,
-    Error(&'s str, Error),
-    Escaped(char),
-    Literal(&'s str),
-}
-
-struct FormatStringFragmentIterator<'s> {
-    format_string: &'s str,
-}
-
-impl<'s> FormatStringFragmentIterator<'s> {
-    pub fn new(format_string: &'s str) -> Self {
-        Self { format_string }
-    }
-}
-
-impl<'s> Iterator for FormatStringFragmentIterator<'s> {
-    type Item = FormatStringFragment<'s>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Exhausted iterator
-        if self.format_string.is_empty() {
-            return None;
-        }
-
-        // Escaped opening braces.
-        if self.format_string.starts_with("{{") {
-            self.format_string = self.format_string.get(2..).unwrap_or("");
-            return Some(FormatStringFragment::Escaped('{'));
-        }
-
-        // Non-escaped opening brace, try to find closing brace or error.
-        if self.format_string.starts_with('{') {
-            return match self.format_string.find('}') {
-                Some(index) => {
-                    self.format_string = self.format_string.get(index + 1..).unwrap_or("");
-                    Some(FormatStringFragment::Argument)
-                }
-                None => {
-                    let result = self.format_string;
-                    self.format_string = "";
-                    Some(FormatStringFragment::Error(
-                        result,
-                        Error::Custom("Malformed format string: missing closing brace"),
-                    ))
-                }
-            };
-        }
-
-        // Regular literal.
-        match self.format_string.find('{') {
-            // Found opening brace, return substring until the brace and update self to start at brace.
-            Some(index) => {
-                let result = &self.format_string[..index];
-                self.format_string = &self.format_string[index..];
-                Some(FormatStringFragment::Literal(result))
-            }
-            // No opening brace, return entire format string.
-            None => {
-                let result = self.format_string;
-                self.format_string = "";
-                Some(FormatStringFragment::Literal(result))
-            }
-        }
-    }
-}
-
 impl Log {
     pub(crate) fn new(metadata: MetadataV1, args: Vec<Var>) -> Self {
         Self { metadata, args }
@@ -149,17 +84,28 @@ impl std::fmt::Display for Log {
 
         for fragment in self.get_format_fragments() {
             match fragment {
-                FormatStringFragment::Argument => {
+                FormatStringFragment::Parameter(parameter) => {
                     if !self.args.is_empty() {
-                        let value = self.args[index].format();
-                        index += 1;
-                        index %= self.args.len();
-                        write!(f, "{}", value)?
+                        let var = match parameter.position {
+                            Some(ParameterPosition::Positional(position)) => {
+                                &self.args[position % self.args.len()]
+                            }
+                            Some(ParameterPosition::Named(_)) => todo!(),
+                            None => {
+                                let res = &self.args[index];
+                                index += 1;
+                                index %= self.args.len();
+                                res
+                            }
+                        };
+                        write!(f, "{}", var.format(&parameter.hint))?
                     }
                 }
-                FormatStringFragment::Error(l, e) => write!(f, "{} ({})", l, e)?,
-                FormatStringFragment::Escaped(c) => write!(f, "{}", c)?,
-                FormatStringFragment::Literal(l) => write!(f, "{}", l)?,
+                FormatStringFragment::Error(literal, error) => {
+                    write!(f, "{} ({})", literal, error)?
+                }
+                FormatStringFragment::Escaped(character) => write!(f, "{}", character)?,
+                FormatStringFragment::Literal(literal) => write!(f, "{}", literal)?,
             }
         }
 

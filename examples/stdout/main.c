@@ -66,8 +66,8 @@ int main(int argc, char* cargv[]) {
   int16_t some_i16 = -12345;
   int32_t some_i32 = -1234567890;
   int64_t some_i64 = -1234567890123456789;
-  float some_f32 = 123.4567890f;
-  double some_f64 = 123.4567890;
+  float some_f32 = 123.4567890123456789f;
+  double some_f64 = 123.4567890123456789;
 
   CDEFMT_INFO("bool: [{}]", some_bool);
   CDEFMT_INFO("u8:   [{}]", some_u8);
@@ -81,6 +81,29 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("f32:  [{}]", some_f32);
   CDEFMT_INFO("f64:  [{}]", some_f64);
 
+  // Format hints
+  CDEFMT_INFO("no formatting  [{}]", some_u32);
+  CDEFMT_INFO("width          [{:20}]", some_u32);
+  CDEFMT_INFO("zero pad       [{:020}]", some_u32);
+
+  CDEFMT_INFO("width align left   [{:<40}]", some_u32);
+  CDEFMT_INFO("width align center [{:^40}]", some_u32);
+  CDEFMT_INFO("width align right  [{:>40}]", some_u32);
+
+  CDEFMT_INFO("no sign  [{:11}]", some_u32);
+  CDEFMT_INFO("sign     [{:+11}]", some_u32);
+  CDEFMT_INFO("negative [{:+11}]", some_i32);
+
+  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f32);
+  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f64);
+
+  CDEFMT_INFO("Binary   [{:#40b}]", some_u32);
+  CDEFMT_INFO("LowerExp [{:#40e}]", some_u32);
+  CDEFMT_INFO("LowerHex [{:#40x}]", some_u32);
+  CDEFMT_INFO("Octal    [{:#40o}]", some_u32);
+  CDEFMT_INFO("Pointer  [{:#40p}]", some_u32);
+  CDEFMT_INFO("UpperExp [{:#40E}]", some_u32);
+  CDEFMT_INFO("UpperHex [{:#40X}]", some_u32);
   // Different structs
   some_struct_t some_struct_typedefd = {
       .a = 1234567890123456789,
@@ -119,6 +142,7 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("some padded struct:           {}", some_padded_struct);
   CDEFMT_INFO("some packed struct typedef'd: {}", some_packed_struct_typedefd);
   CDEFMT_INFO("some packed struct:           {}", some_packed_struct);
+  CDEFMT_INFO("some struct alternate:        {:#}", some_struct);
 
   // Different enums
   enum unsigned_enum some_unsigned_enum = UNSIGNED_ENUM_5;
