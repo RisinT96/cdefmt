@@ -56,7 +56,7 @@ cmake --build build/
 Then run the stdout example and pipe it's stdout into the stdin example:
 
 ```bash
-build/debug/examples/stdout/example-stdout | build/debug/stdin --elf build/debug/examples/stdout/example-stdout
+build/examples/stdout/example-stdout | build/stdin --elf build/examples/stdout/example-stdout
 ```
 
 # License
