@@ -13,7 +13,7 @@ pub(crate) struct Parameter<'s> {
 impl<'s> Parameter<'s> {
     pub(crate) fn parse(param: &'s str) -> Result<Self> {
         let re = regex!(
-            r"((?<position>\d+)|(?<named>[\d\w]+))?(:(?<align>[<\^>])?(?<sign>\+)?(?<alternate>#)?(?<zero_pad>0)?(?<width>\d+)?(\.(?<precision>\d+))?(?<type>[b\?exopeEX])?)?"
+            r"((?<position>\d+)|(?<named>[\d\w]+))?(:(?<align>[<\^>])?(?<sign>\+)?(?<alternate>#)?(?<zero_pad>0)?(?<width>\d+)?(\.(?<precision>\d+))?(?<type>[b\?exospeEX])?)?"
         );
 
         let captures = re.captures(param);
@@ -66,6 +66,7 @@ impl<'s> Parameter<'s> {
                 "e" => DisplayType::LowerExp,
                 "x" => DisplayType::LowerHex,
                 "o" => DisplayType::Octal,
+                "s" => DisplayType::String,
                 "p" => DisplayType::Pointer,
                 "E" => DisplayType::UpperExp,
                 "X" => DisplayType::UpperHex,
@@ -103,6 +104,7 @@ pub enum DisplayType {
     LowerHex,
     Octal,
     Pointer,
+    String,
     UpperExp,
     UpperHex,
 }

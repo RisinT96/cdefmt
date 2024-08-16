@@ -74,6 +74,7 @@ macro_rules! format_common {
 }
 
 macro_rules! format_match {
+    // Match on width and precision
     ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
         match ($width, $precision) {
             (None, None) => format_common!($align, $sign, $alternate, $zero_pad, $ty, $val),
@@ -88,18 +89,21 @@ macro_rules! format_match {
             }
         }
     };
+    // Match on zero pad
     ($align:literal, $sign:literal, $alternate:literal, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
         match ($zero_pad) {
             true => format_match!($align, $sign, $alternate, "0", $width, $precision, $ty, $val),
             false => format_match!($align, $sign, $alternate, "", $width, $precision, $ty, $val),
         }
     };
+    // Match on alternate
     ($align:literal, $sign:literal, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
         match ($alternate) {
             true => format_match!($align, $sign, "#", $zero_pad, $width, $precision, $ty, $val),
             false => format_match!($align, $sign, "", $zero_pad, $width, $precision, $ty, $val),
         }
     };
+    // Match on sign
     ($align:literal, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
         match ($sign) {
             true => {
@@ -110,6 +114,7 @@ macro_rules! format_match {
             }
         }
     };
+    // Match on alignment
     ($align:ident, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
         match ($align) {
             None => format_match!("", $sign, $alternate, $zero_pad, $width, $precision, $ty, $val),
@@ -124,6 +129,7 @@ macro_rules! format_match {
             }
         }
     };
+    // No precision
     ($align:ident, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $ty:literal, $val:ident) => {
         format_match!($align, $sign, $alternate, $zero_pad, $width, None, $ty, $val)
     };
@@ -197,23 +203,32 @@ impl Var {
     }
 
     pub fn format(&self, hint: &DisplayHint) -> String {
-        match self {
-            Var::Bool(true) => "true".to_string(),
-            Var::Bool(false) => "false".to_string(),
-            Var::U8(val) => Self::format_inner(val, hint),
-            Var::U16(val) => Self::format_inner(val, hint),
-            Var::U32(val) => Self::format_inner(val, hint),
-            Var::U64(val) => Self::format_inner(val, hint),
-            Var::I8(val) => Self::format_inner(val, hint),
-            Var::I16(val) => Self::format_inner(val, hint),
-            Var::I32(val) => Self::format_inner(val, hint),
-            Var::I64(val) => Self::format_inner(val, hint),
-            Var::F32(val) => Self::format_float(*val, hint),
-            Var::F64(val) => Self::format_float(*val, hint),
-            Var::Enumeration {
-                value,
-                valid_values,
-            } => {
+        match (self, &hint.ty) {
+            (Var::U8(val), &DisplayType::String) => {
+                std::str::from_utf8(&[*val]).unwrap_or("").to_string()
+            }
+            (Var::I8(val), &DisplayType::String) => {
+                std::str::from_utf8(&[*val as u8]).unwrap_or("").to_string()
+            }
+            (Var::Bool(true), _) => "true".to_string(),
+            (Var::Bool(false), _) => "false".to_string(),
+            (Var::U8(val), _) => Self::format_inner(val, hint),
+            (Var::U16(val), _) => Self::format_inner(val, hint),
+            (Var::U32(val), _) => Self::format_inner(val, hint),
+            (Var::U64(val), _) => Self::format_inner(val, hint),
+            (Var::I8(val), _) => Self::format_inner(val, hint),
+            (Var::I16(val), _) => Self::format_inner(val, hint),
+            (Var::I32(val), _) => Self::format_inner(val, hint),
+            (Var::I64(val), _) => Self::format_inner(val, hint),
+            (Var::F32(val), _) => Self::format_float(*val, hint),
+            (Var::F64(val), _) => Self::format_float(*val, hint),
+            (
+                Var::Enumeration {
+                    value,
+                    valid_values,
+                },
+                _,
+            ) => {
                 let value = match value.as_ref() {
                     Var::U8(v) => *v as i128,
                     Var::U16(v) => *v as i128,
@@ -231,7 +246,7 @@ impl Var {
                     .map(|name| name.to_owned())
                     .unwrap_or_else(|| value.to_string())
             }
-            Var::Structure { members } => {
+            (Var::Structure { members }, _) => {
                 let (start, join, end) = if hint.alternate {
                     ("{\n\t", ",\n\t", "\n}")
                 } else {
@@ -245,7 +260,7 @@ impl Var {
                         .join(join)
                     + end
             }
-            Var::Pointer(value) => {
+            (Var::Pointer(value), _) => {
                 // Override hints for pointer types.
                 let hint = DisplayHint {
                     align: None,
@@ -258,14 +273,19 @@ impl Var {
                 };
                 value.format(&hint)
             }
-            Var::Array(values) => {
-                "[".to_string()
+            (Var::Array(values), _) => {
+                let (start, join, end) = match hint.ty {
+                    DisplayType::String => ("", "", ""),
+                    _ => ("[", ", ", "]"),
+                };
+
+                start.to_string()
                     + &values
                         .iter()
                         .map(|v| v.format(hint))
                         .collect::<Vec<_>>()
-                        .join(", ")
-                    + "]"
+                        .join(join)
+                    + end
             }
         }
     }
@@ -313,6 +333,7 @@ impl Var {
             DisplayType::UpperHex => {
                 format_match!(align, sign, alternate, zero_pad, width, "X", val)
             }
+            _ => unreachable!(),
         }
     }
 
@@ -343,6 +364,7 @@ impl Var {
             DisplayType::Binary => format!("Unable to format [{val}] as Binary!"),
             DisplayType::LowerHex => format!("Unable to format [{val}] as LowerHex!"),
             DisplayType::Octal => format!("Unable to format [{val}] as Octal!"),
+            DisplayType::String => format!("Unable to format [{val}] as String!"),
             DisplayType::Pointer => format!("Unable to format [{val}] as Pointer!"),
             DisplayType::UpperHex => format!("Unable to format [{val}] as UpperHex!"),
         }

@@ -182,6 +182,9 @@ int main(int argc, char* cargv[]) {
     CDEFMT_INFO("Iteration {}", i);
   }
 
+  char some_string[] = "this is some string";
+  CDEFMT_INFO("Some string: {:s}", some_string);
+
   return 0;
 }
 
