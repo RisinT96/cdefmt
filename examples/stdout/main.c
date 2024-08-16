@@ -183,7 +183,9 @@ int main(int argc, char* cargv[]) {
   }
 
   char some_string[] = "this is some string";
-  CDEFMT_INFO("Some string: {:s}", some_string);
+
+  // Quotes have to be double escaped.
+  CDEFMT_INFO("Some string: \\\"{:s}\\\"", some_string);
 
   return 0;
 }
