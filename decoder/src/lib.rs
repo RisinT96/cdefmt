@@ -1,12 +1,11 @@
 use gimli::{DwAte, DwTag, SectionId};
 
-mod dwarf;
+pub mod format;
+pub mod log;
+pub mod decoder;
+pub mod var;
 
-pub mod metadata;
-pub mod parser;
-pub mod r#type;
-
-pub use parser::Parser;
+pub use decoder::Decoder;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -14,6 +13,8 @@ pub enum Error {
     Gimli(#[from] gimli::Error),
     #[error("Json error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("{0}")]
+    Parser(#[from] cdefmt_parser::Error),
     #[error("The provided elf is missing the '.cdefmt' section.")]
     MissingSection,
     #[error("DIE is missing attribute {0}")]
@@ -43,7 +44,7 @@ pub enum Error {
     #[error("There is no DIE at the given offset: {0}")]
     NoDIE(u64),
     #[error("Unsupported schema version: {0}")]
-    SchemaVersion(u32),
+    Schema(u32),
     #[error("{0}")]
     Custom(&'static str),
 }

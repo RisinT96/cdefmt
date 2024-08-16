@@ -20,7 +20,7 @@ fn main() -> std::result::Result<(), String> {
     let file = std::fs::File::open(args.elf).map_err(|e| e.to_string())?;
     let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| e.to_string())?;
 
-    let mut logger = cdefmt_parser::Parser::new(&*mmap).map_err(|e| e.to_string())?;
+    let mut logger = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
 
     let stdin = std::io::stdin();
 
@@ -37,7 +37,7 @@ fn main() -> std::result::Result<(), String> {
             .map(|b| u8::from_str_radix(b, 16).unwrap())
             .collect::<Vec<_>>();
 
-        let log = logger.parse_log(&parsed_buff);
+        let log = logger.decode_log(&parsed_buff);
 
         match log {
             Ok(log) => println!("{:<7} > {}", log.get_level(), log),

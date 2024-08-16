@@ -16,7 +16,7 @@ impl<'s> Parameter<'s> {
             r"((?<position>\d+)|(?<named>[\d\w]+))?(:(?<align>[<\^>])?(?<sign>\+)?(?<alternate>#)?(?<zero_pad>0)?(?<width>\d+)?(\.(?<precision>\d+))?(?<type>[b\?exopeEX])?)?"
         );
 
-        let captures = re.captures(&param);
+        let captures = re.captures(param);
 
         if captures.is_none() {
             return Ok(Self {
@@ -38,44 +38,38 @@ impl<'s> Parameter<'s> {
 
         let position = if let Some(p) = captures.name("position") {
             Some(ParameterPosition::Positional(p.as_str().parse().unwrap()))
-        } else if let Some(n) = captures.name("named") {
-            Some(ParameterPosition::Named(n.as_str()))
         } else {
-            None
+            captures
+                .name("named")
+                .map(|n| ParameterPosition::Named(n.as_str()))
         };
 
-        let align = captures.name("align").and_then(|a| {
-            Some(match a.as_str() {
-                "<" => Alignment::Left,
-                "^" => Alignment::Center,
-                ">" => Alignment::Right,
-                _ => unreachable!("Regex should only capture valid values"),
-            })
+        let align = captures.name("align").map(|a| match a.as_str() {
+            "<" => Alignment::Left,
+            "^" => Alignment::Center,
+            ">" => Alignment::Right,
+            _ => unreachable!("Regex should only capture valid values"),
         });
 
         let sign = captures.name("sign").is_some();
         let alternate = captures.name("alternate").is_some();
         let zero_pad = captures.name("zero_pad").is_some();
-        let width = captures
-            .name("width")
-            .and_then(|w| Some(w.as_str().parse().unwrap()));
+        let width = captures.name("width").map(|w| w.as_str().parse().unwrap());
         let precision = captures
             .name("precision")
-            .and_then(|w| Some(w.as_str().parse().unwrap()));
+            .map(|w| w.as_str().parse().unwrap());
         let ty = captures
             .name("type")
-            .and_then(|ty| {
-                Some(match ty.as_str() {
-                    "b" => DisplayType::Binary,
-                    "?" => DisplayType::Debug,
-                    "e" => DisplayType::LowerExp,
-                    "x" => DisplayType::LowerHex,
-                    "o" => DisplayType::Octal,
-                    "p" => DisplayType::Pointer,
-                    "E" => DisplayType::UpperExp,
-                    "X" => DisplayType::UpperHex,
-                    _ => unreachable!("Regex should only capture valid values"),
-                })
+            .map(|ty| match ty.as_str() {
+                "b" => DisplayType::Binary,
+                "?" => DisplayType::Debug,
+                "e" => DisplayType::LowerExp,
+                "x" => DisplayType::LowerHex,
+                "o" => DisplayType::Octal,
+                "p" => DisplayType::Pointer,
+                "E" => DisplayType::UpperExp,
+                "X" => DisplayType::UpperHex,
+                _ => unreachable!("Regex should only capture valid values"),
             })
             .unwrap_or(DisplayType::Display);
 

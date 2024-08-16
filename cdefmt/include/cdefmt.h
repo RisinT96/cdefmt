@@ -46,7 +46,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* Inner mechanisms */
 
-#define CDEFMT_SCHEMA            1
+#define CDEFMT_SCHEMA_VERSION    1
 #define CDEFMT_GNU_BUILD_ID_SIZE 20
 
 /* Returns the 64th argument */
@@ -85,7 +85,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 #define CDEFMT_FORMAT_MESSAGE(counter_, level_, file_, line_, message_) \
   "{"                                                                   \
-  "\"schema\":"CDEFMT_STRINGIFY(CDEFMT_SCHEMA)","                       \
+  "\"version\":"CDEFMT_STRINGIFY(CDEFMT_SCHEMA_VERSION)","              \
   "\"counter\":"CDEFMT_STRINGIFY(counter_)","                           \
   "\"level\":"CDEFMT_STRINGIFY(level_)","                               \
   "\"file\":\""file_"\","                                               \

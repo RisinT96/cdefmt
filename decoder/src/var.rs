@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
+use cdefmt_parser::r#type::Type;
 use gimli::{Reader, ReaderOffset};
 
 use crate::{
     format::{DisplayHint, DisplayType},
-    r#type::Type,
     Result,
 };
 
@@ -232,7 +232,11 @@ impl Var {
                     .unwrap_or_else(|| value.to_string())
             }
             Var::Structure { members } => {
-                let (start, join, end) = if hint.alternate { ( "{\n\t" , ",\n\t", "\n}") } else { ( "{", ", ", "}" ) };
+                let (start, join, end) = if hint.alternate {
+                    ("{\n\t", ",\n\t", "\n}")
+                } else {
+                    ("{", ", ", "}")
+                };
                 start.to_string()
                     + &members
                         .iter()
