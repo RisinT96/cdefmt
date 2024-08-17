@@ -36,4 +36,5 @@ pub struct Metadata {
     pub line: usize,
     #[serde(rename = "message")]
     pub format_string: String,
+    pub names: Vec<String>,
 }

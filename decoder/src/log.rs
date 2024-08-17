@@ -65,7 +65,14 @@ impl std::fmt::Display for Log {
                         Some(ParameterPosition::Positional(position)) => {
                             &args[position % args.len()]
                         }
-                        Some(ParameterPosition::Named(_)) => todo!(),
+                        Some(ParameterPosition::Named(name)) => {
+                            if let Some(pos) = self.metadata.names.iter().position(|n| n == name) {
+                                &args[pos]
+                            } else {
+                                write!(f, "{{Unknown named parameter: {name}}}")?;
+                                continue;
+                            }
+                        }
                         None => {
                             let res = &args[index];
                             index += 1;
@@ -76,7 +83,7 @@ impl std::fmt::Display for Log {
                     write!(f, "{}", var.format(&parameter.hint))?
                 }
                 FormatStringFragment::Error(literal, error) => {
-                    write!(f, "{} ({})", literal, error)?
+                    write!(f, "{literal} ({error})")?
                 }
                 FormatStringFragment::Escaped(character) => write!(f, "{}", character)?,
                 FormatStringFragment::Literal(literal) => write!(f, "{}", literal)?,

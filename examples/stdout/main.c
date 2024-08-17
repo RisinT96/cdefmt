@@ -187,6 +187,12 @@ int main(int argc, char* cargv[]) {
   // Quotes have to be double escaped.
   CDEFMT_INFO("Some string: \\\"{:s}\\\"", some_string);
 
+  CDEFMT_INFO("Named parameters: {some_f32} {some_struct.b} {1} {some_u16} {}", some_bool, some_u16,
+              some_f32, some_struct.b);
+
+  CDEFMT_INFO("Wrong named parameters: {asome_f32} {some_struct.ba} {1} {some_u16} {}", some_bool, some_u16,
+              some_f32, some_struct.b);
+
   return 0;
 }
 
