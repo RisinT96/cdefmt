@@ -8,12 +8,13 @@ Inspired by <https://github.com/knurling-rs/defmt/>
 
 The idea is simple, we want to spend as little time as possible on creating logs, and have them take up as little space as possible.
 
-`cdefmt` achieves that through a two phased approach:
+`cdefmt` achieves that through a multi phased approach:
 1. Encode as much information as possible at compile time<br>
    Done via the macros in `cdefmt/include/cdefmt.h` and some modifications to the compilation flags/linkerscript.<br>
-   All of the log strings, parameter format and size information are encoded at compile time into the binary.
-2. Defer the formatting logic to post processing<br>
-   Performed by the rust library [cdefmt-decoder](decoder/)
+   All of the log strings, parameter format and size information are encoded at compile time into the binary, these can be stripped from the shipped binary.
+2. Have minimal information encoded into each log - only an ID and the raw values of the arguments.
+3. Defer the formatting logic to post processing<br>
+   Performed by the rust library [cdefmt-decoder](decoder/), using information from the originally compiled binary to parse the ID and arguments into a full string.
 
 For more technical details refer to [Technical Details](#technical-details)
 
