@@ -4,6 +4,21 @@
 
 Inspired by <https://github.com/knurling-rs/defmt/>
 
+# Table of Contents
+
+1.  [What is this](#what-is-this)
+2.  [Usage](#usage)
+    1.  [Example](#example)
+    2.  [Setup](#setup)
+        1. [c](#c)
+3.  [Technical Details](#technical-details)
+    1.  [Generation](#generation)
+    2.  [Metadata](#metadata)
+        1.  [linker script `.cdefmt` section](#linker-script-cdefmt-section)
+        2.  [Debugging information](#debugging-information)
+    3.  [Parsing](#parsing)
+4.  [License](#license)
+
 # What is this?
 
 The idea is simple, we want to spend as little time as possible on creating logs, and have them take up as little space as possible.
