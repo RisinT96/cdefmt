@@ -56,7 +56,7 @@ build/examples/stdout/example-stdout-stripped | build/stdin --elf build/examples
 
 This means that it's possible to ship stripped binaries, while using the originals to parse the logs.
 
-After the stipping process the following are removed from the binary:
+The stripping process removes the following from the binary:
 1. log strings
 2. debugging information
 3. symbol table
