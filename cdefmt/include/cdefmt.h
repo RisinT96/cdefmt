@@ -24,7 +24,10 @@
 
 static inline int cdefmt_init();
 #define CDEFMT_GENERATE_INIT()  __CDEFMT_GENERATE_INIT()
+
+#ifndef CDEFMT_DYNAMIC_MAX_SIZE
 #define CDEFMT_DYNAMIC_MAX_SIZE 128
+#endif
 
 enum cdefmt_level {
   CDEFMT_LEVEL_ERR = __CDEFMT_LEVEL_ERR,
