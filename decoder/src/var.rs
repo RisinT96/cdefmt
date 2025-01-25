@@ -205,9 +205,15 @@ impl Var {
     pub fn format(&self, hint: &DisplayHint) -> String {
         match (self, &hint.ty) {
             (Var::U8(val), &DisplayType::String) => {
+                if *val == 0 {
+                    return "".to_string();
+                }
                 std::str::from_utf8(&[*val]).unwrap_or("").to_string()
             }
             (Var::I8(val), &DisplayType::String) => {
+                if *val == 0 {
+                    return "".to_string();
+                }
                 std::str::from_utf8(&[*val as u8]).unwrap_or("").to_string()
             }
             (Var::Bool(true), _) => "true".to_string(),
