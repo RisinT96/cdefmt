@@ -193,6 +193,12 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("Wrong named parameters: {asome_f32} {some_struct.ba} {1} {some_u16} {}", some_bool, some_u16,
               some_f32, some_struct.b);
 
+  // Dynamic strings
+  char* dynamic_string = "This is a dynamic string, the size is not known at compile time.";
+
+  CDEFMT_INFO("Dynamic string: {:s}", CDEFMT_DYNAMIC_STRING(dynamic_string));
+  CDEFMT_INFO("Dynamic string (truncated): {:s}", CDEFMT_DYNAMIC_STRING_N(dynamic_string, 20));
+
   return 0;
 }
 
