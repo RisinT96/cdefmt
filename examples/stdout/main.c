@@ -202,16 +202,9 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
   fstat(1, &stat);
 
   if (S_ISFIFO(stat.st_mode)) {
-    // When piping, write the data as hex
-    for (size_t i = 0; i < size; i++) {
-      printf("%02x", ((const uint8_t*)log)[i]);
-
-      if (i + 1 < size) {
-        printf(";");
-      }
-    }
-
-    printf("\n");
+    // Write raw binary data
+    fwrite(&size, sizeof(size), 1, stdout);
+    fwrite(log, size, 1, stdout);
     return;
   }
 

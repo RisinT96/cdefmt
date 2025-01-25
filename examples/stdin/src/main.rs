@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::Read, path::PathBuf};
 
 use clap::Parser;
 
@@ -22,22 +22,19 @@ fn main() -> std::result::Result<(), String> {
 
     let mut logger = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
 
-    let stdin = std::io::stdin();
+    let mut stdin = std::io::stdin();
 
-    let mut buff = Default::default();
+    let mut len = [0; std::mem::size_of::<usize>()];
 
-    while let Ok(s) = stdin.read_line(&mut buff) {
-        if s == 0 {
-            break;
-        }
+    while stdin.read_exact(&mut len).is_ok() {
+        let len = usize::from_ne_bytes(len);
+        let mut buff = vec![0; len];
 
-        let parsed_buff = buff
-            .trim()
-            .split(';')
-            .map(|b| u8::from_str_radix(b, 16).unwrap())
-            .collect::<Vec<_>>();
+        stdin
+            .read_exact(buff.as_mut_slice())
+            .map_err(|e| e.to_string())?;
 
-        let log = logger.decode_log(&parsed_buff);
+        let log = logger.decode_log(&buff);
 
         match log {
             Ok(log) => println!("{:<7} > {}", log.get_level(), log),
