@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 #include "cdefmt/include/cdefmt.h"
@@ -190,14 +191,37 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("Named parameters: {some_f32} {some_struct.b} {1} {some_u16} {}", some_bool, some_u16,
               some_f32, some_struct.b);
 
-  CDEFMT_INFO("Wrong named parameters: {asome_f32} {some_struct.ba} {1} {some_u16} {}", some_bool, some_u16,
-              some_f32, some_struct.b);
+  CDEFMT_INFO("Wrong named parameters: {asome_f32} {some_struct.ba} {1} {some_u16} {}", some_bool,
+              some_u16, some_f32, some_struct.b);
 
   // Dynamic strings
+
   char* dynamic_string = "This is a dynamic string, the size is not known at compile time.";
 
   CDEFMT_INFO("Dynamic string: {:s}", CDEFMT_DYNAMIC_STRING(dynamic_string));
   CDEFMT_INFO("Dynamic string (truncated): {:s}", CDEFMT_DYNAMIC_STRING_N(dynamic_string, 20));
+
+  // Dynamic arrays
+  some_struct_t* dynamic_struct = calloc(3, sizeof(some_struct_t));
+  size_t struct_len = 2;
+
+  dynamic_struct[0].a = 1;
+  dynamic_struct[0].b = 2;
+  dynamic_struct[0].c = 3;
+  dynamic_struct[1].a = 101;
+  dynamic_struct[1].b = 102;
+  dynamic_struct[1].c = 103;
+  dynamic_struct[2].a = 201;
+  dynamic_struct[2].b = 202;
+  dynamic_struct[2].c = 203;
+
+  CDEFMT_INFO("Dynamic array: {}", CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len));
+
+  struct_len++;
+
+  CDEFMT_INFO("Dynamic array ++ : {}", CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len));
+
+  free(dynamic_struct);
 
   return 0;
 }

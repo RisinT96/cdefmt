@@ -375,4 +375,21 @@ impl Var {
             DisplayType::UpperHex => format!("Unable to format [{val}] as UpperHex!"),
         }
     }
+
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            Var::Bool(v) => *v as u64,
+            Var::U8(v) => *v as u64,
+            Var::U16(v) => *v as u64,
+            Var::U32(v) => *v as u64,
+            Var::U64(v) => *v as u64,
+            Var::I8(v) => *v as u64,
+            Var::I16(v) => *v as u64,
+            Var::I32(v) => *v as u64,
+            Var::I64(v) => *v as u64,
+            Var::F32(v) => *v as u64,
+            Var::F64(v) => *v as u64,
+            _ => todo!("Should probably return an Option here or something"),
+        }
+    }
 }

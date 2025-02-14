@@ -2,7 +2,11 @@
 
 use std::collections::HashMap;
 
-use cdefmt_parser::{metadata::Metadata, r#type::Type, Parser};
+use cdefmt_parser::{
+    metadata::Metadata,
+    r#type::{self, Type},
+    Parser,
+};
 use gimli::Reader;
 use object::ReadRef;
 
@@ -39,7 +43,7 @@ impl<'data> Decoder<'data> {
         let (metadata, ty) = self.log_cache.get(&id).unwrap();
 
         let args = if let Some(ty) = ty {
-            Some(self.parse_log_args(ty, data)?)
+            Some(Self::decode_log_args(ty, data)?)
         } else {
             None
         };
@@ -54,24 +58,40 @@ impl<'data> Decoder<'data> {
     }
 
     // Parses the log's arguments.
-    fn parse_log_args<R: Reader>(&self, ty: &Type, mut data: R) -> Result<Vec<Var>> {
+    fn decode_log_args<R: Reader>(ty: &Type, mut data: R) -> Result<Vec<Var>> {
         let members = if let Type::Structure(members) = ty {
             members
         } else {
             return Err(Error::Custom("The log's args aren't a structure!"));
         };
 
+        // We already read the log_id from the data, skip it.
+        let members = &members[1..];
+
         // Parse the raw data into `Var` representation.
-        members
+        let mut decoded = members
             .iter()
-            // We already read the log_id from the data, skip it.
             // The dynamic data should be at the end, ignore it, we'll come back for it afterwards.
+            // Not all logs necessarily have it, so we skip by name, instead of outright ignoring
+            // the last element.
             .filter(|m| match m.name.as_str() {
-                "log_id" | "dynamic_data" => false,
+                "dynamic_data" => false,
                 _ => true,
             })
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
-            .collect()
+            .collect::<Result<Vec<_>>>()?;
+
+        // Decode dynamic members
+        for (i, member) in members.iter().enumerate() {
+            match member.name.as_str() {
+                n if n.contains("dynamic_array") => {
+                    decoded[i] = Self::decode_dynamic_array(member, &decoded[i], &mut data)?
+                }
+                _ => continue,
+            }
+        }
+
+        Ok(decoded)
     }
 
     fn validate_init(&self, log: &Log) -> Result<()> {
@@ -98,5 +118,44 @@ impl<'data> Decoder<'data> {
         } else {
             Err(Error::Custom("Build ID missing or not an array"))
         }
+    }
+
+    fn decode_dynamic_array<R: Reader>(
+        metadata: &r#type::StructureMember,
+        value: &Var,
+        data: &mut R,
+    ) -> Result<Var> {
+        // The dynamic_array is structured as:
+        // [0] size
+        // [1] type
+
+        // Extract size from value that was previously decoded
+        let size = match value {
+            Var::Structure { members } => &members[0].value,
+            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!")),
+        }
+        .as_u64();
+
+        // Extract type from metadata
+        let arr_ty = match &metadata.ty {
+            Type::Structure(members) => &members[1].ty,
+            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!")),
+        };
+
+        let ty = match arr_ty {
+            Type::Array { ty, .. } => ty,
+            _ => {
+                return Err(Error::Custom(
+                    "Dynamic array type metadata is not an array!",
+                ))
+            }
+        };
+
+        let dyn_ty = Type::Array {
+            ty: ty.clone(),
+            lengths: vec![size / ty.size() as u64],
+        };
+
+        Ok(Var::parse(&dyn_ty, data)?.0)
     }
 }

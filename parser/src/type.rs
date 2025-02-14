@@ -34,3 +34,37 @@ pub struct StructureMember {
     pub name: String,
     pub ty: Type,
 }
+
+impl Type {
+    pub fn size(&self) -> usize {
+        match self {
+            Type::Bool => 1,
+            Type::U8 => 1,
+            Type::U16 => 2,
+            Type::U32 => 4,
+            Type::U64 => 8,
+            Type::I8 => 1,
+            Type::I16 => 2,
+            Type::I32 => 4,
+            Type::I64 => 8,
+            Type::F32 => 4,
+            Type::F64 => 8,
+            Type::Enumeration { ty, .. } => ty.size(),
+            Type::Structure(structure_members) => {
+                if let Some(last) = structure_members.last() {
+                    last.offset as usize + last.ty.size()
+                } else {
+                    0
+                }
+            }
+            Type::Pointer(ty) => ty.size(),
+            Type::Array { ty, lengths } => {
+                if lengths.len() == 0 {
+                    return 0;
+                }
+
+                ty.size() * (lengths.iter().fold(1, |acc, x| acc * x) as usize)
+            }
+        }
+    }
+}
