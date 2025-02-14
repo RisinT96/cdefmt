@@ -308,6 +308,13 @@ fn parse_structure<R: Reader>(
 ) -> Result<Type> {
     let mut members = vec![];
 
+    // Unwrap should be safe here.
+    let entry = entries.current().unwrap();
+
+    // TODO: handle DW_AT_bit_size
+    let size = get_attribute!(entry, gimli::DW_AT_byte_size);
+    let size = size.udata_value().unwrap() as usize;
+
     // Step into member DIEs
     if let Some((1, mut entry)) = entries.next_dfs()? {
         // Iterate over all the siblings until there's no more.
@@ -346,7 +353,7 @@ fn parse_structure<R: Reader>(
         }
     }
 
-    Ok(Type::Structure(members))
+    Ok(Type::Structure{members, size})
 }
 
 fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<u64> {
