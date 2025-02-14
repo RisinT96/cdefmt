@@ -20,7 +20,10 @@ pub enum Type {
         /// Use i128 to deal with u64 and i64 enums.
         valid_values: BTreeMap<i128, String>,
     },
-    Structure(Vec<StructureMember>),
+    Structure {
+        members: Vec<StructureMember>,
+        size: usize,
+    },
     Pointer(Box<Type>),
     Array {
         ty: Box<Type>,
@@ -50,12 +53,8 @@ impl Type {
             Type::F32 => 4,
             Type::F64 => 8,
             Type::Enumeration { ty, .. } => ty.size(),
-            Type::Structure(structure_members) => {
-                if let Some(last) = structure_members.last() {
-                    last.offset as usize + last.ty.size()
-                } else {
-                    0
-                }
+            Type::Structure { size, .. } => {
+                return *size;
             }
             Type::Pointer(ty) => ty.size(),
             Type::Array { ty, lengths } => {

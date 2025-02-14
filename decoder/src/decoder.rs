@@ -59,7 +59,7 @@ impl<'data> Decoder<'data> {
 
     // Parses the log's arguments.
     fn decode_log_args<R: Reader>(ty: &Type, mut data: R) -> Result<Vec<Var>> {
-        let members = if let Type::Structure(members) = ty {
+        let members = if let Type::Structure { members, .. } = ty {
             members
         } else {
             return Err(Error::Custom("The log's args aren't a structure!"));
@@ -138,7 +138,7 @@ impl<'data> Decoder<'data> {
 
         // Extract type from metadata
         let arr_ty = match &metadata.ty {
-            Type::Structure(members) => &members[1].ty,
+            Type::Structure { members, .. } => &members[1].ty,
             _ => return Err(Error::Custom("Dynamic array metadata is not a struct!")),
         };
 

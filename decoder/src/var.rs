@@ -162,7 +162,7 @@ impl Var {
                     bytes,
                 )
             }
-            Type::Structure(members) => {
+            Type::Structure { members, size } => {
                 let mut total_offset = 0;
                 let members = members
                     .iter()
@@ -182,7 +182,11 @@ impl Var {
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                (Var::Structure { members }, total_offset)
+
+                let bytes_to_skip = *size as u64 - total_offset;
+                data.skip(ReaderOffset::from_u64(bytes_to_skip)?)?;
+
+                (Var::Structure { members }, *size as u64)
             }
             Type::Pointer(ty) => {
                 let (value, bytes) = Self::parse(ty, data)?;
