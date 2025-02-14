@@ -75,53 +75,39 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_PARAMETER_GET_VALUE(parameter_) BOOST_PP_TUPLE_ELEM(1, parameter_)
 
 /* Generate argument name for metadata string */
-#define __CDEFMT_PARAMETER_GENERATE_METADATA_ARG_NAME_INNER(type_, value_) \
-  BOOST_PP_EXPR_IIF(BOOST_VMD_EQUAL(type_, DYNAMIC_ARRAY),                 \
-                    __CDEFMT_DYNAMIC_ARRAY_GENERATE_METADATA_ARG_NAME)(value_)
-
-#define __CDEFMT_PARAMETER_GENERATE_METADATA_ARG_NAME(parameter_)                            \
-  __CDEFMT_PARAMETER_GENERATE_METADATA_ARG_NAME_INNER(CDEFMT_PARAMETER_GET_TYPE(parameter_), \
-                                                      CDEFMT_PARAMETER_GET_VALUE(parameter_))
+#define __CDEFMT_GENERATE_METADATA_ARG_NAME_PARAMETER(parameter_) \
+  BOOST_PP_CAT(__CDEFMT_GENERATE_METADATA_ARG_NAME_,              \
+               CDEFMT_PARAMETER_GET_TYPE(parameter_))(CDEFMT_PARAMETER_GET_VALUE(parameter_))
 
 /* Generate field for log struct */
-#define __CDEFMT_PARAMETER_GENERATE_LOG_ARG_INNER(counter_, i_, type_, value_) \
-  BOOST_PP_EXPR_IIF(BOOST_VMD_EQUAL(type_, DYNAMIC_ARRAY),                     \
-                    __CDEFMT_DYNAMIC_ARRAY_GENERATE_LOG_ARG)(counter_, i_, value_)
-
-#define __CDEFMT_PARAMETER_GENERATE_LOG_ARG(counter_, i_, parameter_)                            \
-  __CDEFMT_PARAMETER_GENERATE_LOG_ARG_INNER(counter_, i_, CDEFMT_PARAMETER_GET_TYPE(parameter_), \
-                                            CDEFMT_PARAMETER_GET_VALUE(parameter_))
+#define __CDEFMT_GENERATE_LOG_ARG_PARAMETER(counter_, i_, parameter_)              \
+  BOOST_PP_CAT(__CDEFMT_GENERATE_LOG_ARG_, CDEFMT_PARAMETER_GET_TYPE(parameter_))( \
+      counter_, i_, CDEFMT_PARAMETER_GET_VALUE(parameter_))
 
 /* Assign log struct field */
-#define __CDEFMT_PARAMETER_ASSIGN_LOG_ARG_INNER(counter_, i_, type_, value_)                       \
-  BOOST_PP_EXPR_IIF(BOOST_VMD_EQUAL(type_, DYNAMIC_ARRAY), __CDEFMT_DYNAMIC_ARRAY_ASSIGN_LOG_ARG)( \
-      counter_, i_, value_)
 
-#define __CDEFMT_PARAMETER_ASSIGN_LOG_ARG(counter_, i_, parameter_)                            \
-  __CDEFMT_PARAMETER_ASSIGN_LOG_ARG_INNER(counter_, i_, CDEFMT_PARAMETER_GET_TYPE(parameter_), \
-                                          CDEFMT_PARAMETER_GET_VALUE(parameter_))
+#define __CDEFMT_ASSIGN_LOG_ARG_PARAMETER(counter_, i_, parameter_)              \
+  BOOST_PP_CAT(__CDEFMT_ASSIGN_LOG_ARG_, CDEFMT_PARAMETER_GET_TYPE(parameter_))( \
+      counter_, i_, CDEFMT_PARAMETER_GET_VALUE(parameter_))
 
 /* ---------------------------------------- Dynamic Array --------------------------------------- */
-
-#define BOOST_VMD_REGISTER_DYNAMIC_ARRAY (DYNAMIC_ARRAY)
-#define BOOST_VMD_DETECT_DYNAMIC_ARRAY_DYNAMIC_ARRAY
 
 #define __CDEFMT_DYNAMIC_ARRAY(array_, length_)         (array_, length_)
 #define CDEFMT_DYNAMIC_ARRAY_GET_ARRAY(dynamic_array_)  BOOST_PP_TUPLE_ELEM(0, dynamic_array_)
 #define CDEFMT_DYNAMIC_ARRAY_GET_LENGTH(dynamic_array_) BOOST_PP_TUPLE_ELEM(1, dynamic_array_)
 
-#define __CDEFMT_DYNAMIC_ARRAY_GENERATE_METADATA_ARG_NAME(dynamic_array_) \
+#define __CDEFMT_GENERATE_METADATA_ARG_NAME_DYNAMIC_ARRAY(dynamic_array_) \
   BOOST_PP_STRINGIZE(CDEFMT_DYNAMIC_ARRAY_GET_ARRAY(dynamic_array_))
 
 /* We put length information into the field, and encode the type using a zero length array.
  * The actual data will be appended at the end of the arguments array, in the dynamic array */
-#define __CDEFMT_DYNAMIC_ARRAY_GENERATE_LOG_ARG(counter_, i_, dynamic_array_) \
+#define __CDEFMT_GENERATE_LOG_ARG_DYNAMIC_ARRAY(counter_, i_, dynamic_array_) \
   struct __attribute__((packed)) {                                            \
-    size_t size;                                                            \
+    size_t size;                                                              \
     __typeof__(*CDEFMT_DYNAMIC_ARRAY_GET_ARRAY(dynamic_array_)) type[0];      \
   } dynamic_array##_##i_
 
-#define __CDEFMT_DYNAMIC_ARRAY_ASSIGN_LOG_ARG_INNER(counter_, i_, array_, length_)     \
+#define __CDEFMT_ASSIGN_LOG_ARG_DYNAMIC_ARRAY_INNER(counter_, i_, array_, length_)     \
   do {                                                                                 \
     size_t cdefmt_increment = 0;                                                       \
     if (cdefmt_dynamic_offset < CDEFMT_DYNAMIC_MAX_SIZE) {                             \
@@ -131,11 +117,11 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
              cdefmt_increment);                                                        \
       cdefmt_dynamic_offset += cdefmt_increment;                                       \
     }                                                                                  \
-    (CDEFMT_LOG_ARGS(counter_)).dynamic_array_##i_.size = cdefmt_increment;          \
+    (CDEFMT_LOG_ARGS(counter_)).dynamic_array_##i_.size = cdefmt_increment;            \
   } while (0)
 
-#define __CDEFMT_DYNAMIC_ARRAY_ASSIGN_LOG_ARG(counter_, i_, dynamic_array_)                   \
-  __CDEFMT_DYNAMIC_ARRAY_ASSIGN_LOG_ARG_INNER(counter_, i_,                                   \
+#define __CDEFMT_ASSIGN_LOG_ARG_DYNAMIC_ARRAY(counter_, i_, dynamic_array_)                   \
+  __CDEFMT_ASSIGN_LOG_ARG_DYNAMIC_ARRAY_INNER(counter_, i_,                                   \
                                               CDEFMT_DYNAMIC_ARRAY_GET_ARRAY(dynamic_array_), \
                                               CDEFMT_DYNAMIC_ARRAY_GET_LENGTH(dynamic_array_))
 
@@ -198,7 +184,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   BOOST_PP_IF(i_, ",", )                                                                          \
   /* Insert stringified parameter surrounded by quotes */                                         \
   "\"" BOOST_PP_IF(BOOST_VMD_IS_TUPLE(elem_),                                                     \
-                   __CDEFMT_PARAMETER_GENERATE_METADATA_ARG_NAME, /* Handle special parameters */ \
+                   __CDEFMT_GENERATE_METADATA_ARG_NAME_PARAMETER, /* Handle special parameters */ \
                    BOOST_PP_STRINGIZE)                            /* Handle regular parameters */ \
       (elem_) "\""
 
@@ -228,7 +214,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define ___CDEFMT_GENERATE_LOG_ARG(counter_, i_, elem_) __typeof__(elem_) arg##i_
 #define __CDEFMT_GENERATE_LOG_ARG(r_, counter_, i_, elem_)                         \
   BOOST_PP_IF(BOOST_VMD_IS_TUPLE(elem_),                                           \
-              __CDEFMT_PARAMETER_GENERATE_LOG_ARG, /* Handle special parameters */ \
+              __CDEFMT_GENERATE_LOG_ARG_PARAMETER, /* Handle special parameters */ \
               ___CDEFMT_GENERATE_LOG_ARG)          /* Handle regular parameters */ \
   (counter_, i_, elem_);
 
@@ -244,7 +230,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 #define __CDEFMT_ASSIGN_LOG_ARG(r_, counter_, i_, elem_)                         \
   BOOST_PP_IF(BOOST_VMD_IS_TUPLE(elem_),                                         \
-              __CDEFMT_PARAMETER_ASSIGN_LOG_ARG, /* Handle special parameters */ \
+              __CDEFMT_ASSIGN_LOG_ARG_PARAMETER, /* Handle special parameters */ \
               CDEFMT_ASSIGN_MEMCPY)              /* Handle regular parameters */ \
   (counter_, i_, elem_);
 #define CDEFMT_ASSIGN_LOG_ARGS(counter_, args_seq_) \
