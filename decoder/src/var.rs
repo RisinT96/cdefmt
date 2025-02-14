@@ -339,7 +339,7 @@ impl Var {
             DisplayType::UpperHex => {
                 format_match!(align, sign, alternate, zero_pad, width, "X", val)
             }
-            _ => unreachable!(),
+            _ => unreachable!("Unexpected hint: {:?}", ty),
         }
     }
 

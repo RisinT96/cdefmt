@@ -64,9 +64,12 @@ impl<'data> Decoder<'data> {
         // Parse the raw data into `Var` representation.
         members
             .iter()
-            // Due to the way the log is constructed in the c code, the first argument is always the
-            // log id, we already have it.
-            .skip(1)
+            // We already read the log_id from the data, skip it.
+            // The dynamic data should be at the end, ignore it, we'll come back for it afterwards.
+            .filter(|m| match m.name.as_str() {
+                "log_id" | "dynamic_data" => false,
+                _ => true,
+            })
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect()
     }

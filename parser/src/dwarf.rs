@@ -208,7 +208,7 @@ fn parse_type<R: Reader>(
                 if let AttributeValue::UnitRef(unit_ref) = type_ref {
                     parse_type(dwarf, unit, unit_ref)
                 } else {
-                    Err(Error::NoNullTerm)
+                    Err(Error::BadAttribute)
                 }
             }
             _ => Err(Error::UnexpectedTag(tag)),
@@ -312,27 +312,30 @@ fn parse_structure<R: Reader>(
     if let Some((1, mut entry)) = entries.next_dfs()? {
         // Iterate over all the siblings until there's no more.
         loop {
-            // Get the name of the member.
-            let name = get_attribute!(entry, gimli::DW_AT_name);
-            let name = dwarf.attr_string(unit, name)?;
-            let name = name.to_string()?.to_string();
+            // Skip non members.
+            if entry.tag() == gimli::DW_TAG_member {
+                // Get the name of the member.
+                let name = get_attribute!(entry, gimli::DW_AT_name);
+                let name = dwarf.attr_string(unit, name)?;
+                let name = name.to_string()?.to_string();
 
-            // Get the type of the member.
-            let ty = if let AttributeValue::UnitRef(unit_offset) =
-                get_attribute!(entry, gimli::DW_AT_type)
-            {
-                parse_type(dwarf, unit, unit_offset)?
-            } else {
-                return Err(Error::BadAttribute);
-            };
+                // Get the type of the member.
+                let ty = if let AttributeValue::UnitRef(unit_offset) =
+                    get_attribute!(entry, gimli::DW_AT_type)
+                {
+                    parse_type(dwarf, unit, unit_offset)?
+                } else {
+                    return Err(Error::BadAttribute);
+                };
 
-            // Get the members offset from the struct's beginning.
-            let offset = entry
-                .attr_value(gimli::DW_AT_data_member_location)?
-                .and_then(|o| o.udata_value())
-                .unwrap_or(0);
+                // Get the members offset from the struct's beginning.
+                let offset = entry
+                    .attr_value(gimli::DW_AT_data_member_location)?
+                    .and_then(|o| o.udata_value())
+                    .unwrap_or(0);
 
-            members.push(StructureMember { name, ty, offset });
+                members.push(StructureMember { name, ty, offset });
+            }
 
             // Get next sibling or break iteration.
             entry = if let Some(e) = entries.next_sibling()? {
@@ -344,6 +347,30 @@ fn parse_structure<R: Reader>(
     }
 
     Ok(Type::Structure(members))
+}
+
+fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<u64> {
+    // If we have a count attribute - use it instead of lower/upped bounds.
+    if let Some(value) = entry.attr_value(gimli::DW_AT_count)? {
+        if let Some(value) = value.udata_value() {
+            return Ok(value);
+        } else {
+            return Err(Error::BadAttribute);
+        }
+    }
+
+    // Lower bound is optional, defaults to 0 if not provided.
+    let lower_bound = entry
+        .attr_value(gimli::DW_AT_lower_bound)?
+        .map_or(Ok(0), |v| v.udata_value().ok_or(Error::BadAttribute))?;
+
+    let upper_bound = entry
+        .attr_value(gimli::DW_AT_upper_bound)?
+        .ok_or(Error::NoAttribute(gimli::DW_AT_upper_bound))?
+        .udata_value()
+        .ok_or(Error::BadAttribute)?;
+
+    Ok(1 + upper_bound - lower_bound)
 }
 
 /// Parses the array type whose DIE is pointed to by the entries cursor.
@@ -373,37 +400,7 @@ fn parse_array<R: Reader>(
     if let Some((1, mut entry)) = entries.next_dfs()? {
         // Iterate over all the siblings until there's no more.
         loop {
-            // Get the type of the member.
-            if let Some(AttributeValue::Udata(count)) = entry.attr_value(gimli::DW_AT_count)? {
-                lengths.push(count);
-                continue;
-            }
-
-            let lower_bound = if let Some(AttributeValue::Udata(lower_bound)) =
-                entry.attr_value(gimli::DW_AT_lower_bound)?
-            {
-                lower_bound
-            } else {
-                0
-            };
-
-            let upper_bound = if let Some(value) = entry.attr_value(gimli::DW_AT_upper_bound)? {
-                // Size of array is upper bound + 1 - lower_bound
-                match value {
-                    AttributeValue::Data1(value) => value as u64 + 1,
-                    AttributeValue::Data2(value) => value as u64 + 1,
-                    AttributeValue::Data4(value) => value as u64 + 1,
-                    AttributeValue::Data8(value) => value + 1,
-                    AttributeValue::Udata(value) => value + 1,
-                    // Zero sized array
-                    AttributeValue::Sdata(-1) => 0,
-                    _ => return Err(Error::BadAttribute),
-                }
-            } else {
-                return Err(Error::Custom("Missing array upper bound!"));
-            };
-
-            lengths.push(upper_bound - lower_bound);
+            lengths.push(parse_array_dimension(entry)?);
 
             // Get next sibling or break iteration.
             entry = if let Some(e) = entries.next_sibling()? {
