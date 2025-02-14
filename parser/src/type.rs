@@ -53,16 +53,14 @@ impl Type {
             Type::F32 => 4,
             Type::F64 => 8,
             Type::Enumeration { ty, .. } => ty.size(),
-            Type::Structure { size, .. } => {
-                return *size;
-            }
+            Type::Structure { size, .. } => *size,
             Type::Pointer(ty) => ty.size(),
             Type::Array { ty, lengths } => {
-                if lengths.len() == 0 {
+                if lengths.is_empty() {
                     return 0;
                 }
 
-                ty.size() * (lengths.iter().fold(1, |acc, x| acc * x) as usize)
+                ty.size() * (lengths.iter().product::<u64>() as usize)
             }
         }
     }

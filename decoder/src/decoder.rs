@@ -74,10 +74,7 @@ impl<'data> Decoder<'data> {
             // The dynamic data should be at the end, ignore it, we'll come back for it afterwards.
             // Not all logs necessarily have it, so we skip by name, instead of outright ignoring
             // the last element.
-            .filter(|m| match m.name.as_str() {
-                "dynamic_data" => false,
-                _ => true,
-            })
+            .filter(|m| !matches!(m.name.as_str(), "dynamic_data"))
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect::<Result<Vec<_>>>()?;
 

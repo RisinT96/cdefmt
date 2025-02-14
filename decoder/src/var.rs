@@ -386,7 +386,7 @@ impl Var {
             Var::U8(v) => *v as u64,
             Var::U16(v) => *v as u64,
             Var::U32(v) => *v as u64,
-            Var::U64(v) => *v as u64,
+            Var::U64(v) => *v ,
             Var::I8(v) => *v as u64,
             Var::I16(v) => *v as u64,
             Var::I32(v) => *v as u64,
