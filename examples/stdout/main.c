@@ -1,10 +1,16 @@
 #include <cdefmt/include/cdefmt.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#if defined(CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER
+uint8_t cdefmt_global_buffer[CDEFMT_STATIC_LOG_BUFFER_SIZE];
+pthread_mutex_t cdefmt_global_buffer_lock;
+#endif /* defined (CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER */
 
 typedef struct some_struct {
   uint64_t a;
@@ -43,6 +49,10 @@ typedef enum signed_enum {
 CDEFMT_GENERATE_INIT()
 
 int main(int argc, char* cargv[]) {
+#if defined(CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER
+  pthread_mutex_init(&cdefmt_global_buffer_lock, NULL);
+#endif /* defined (CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER */
+
   if (cdefmt_init()) {
     return 1;
   }
@@ -226,11 +236,48 @@ int main(int argc, char* cargv[]) {
 
   CDEFMT_INFO("Dynamic array 2 : {}", CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len));
 
-  CDEFMT_INFO("Dynamic array: {}, dynamic string: '{:s}'",
-              CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len),
+  CDEFMT_INFO("Dynamic array: {}, some_packed_struct: {}, dynamic string: '{:s}'",
+              CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len), some_packed_struct,
               CDEFMT_DYNAMIC_STRING(dynamic_string));
 
+  /* Thanks ChatGPT 😅 */
+  char* really_long_string =
+      "The Last Signal\n"
+      "The spaceship Aurora drifted through the silent void, its systems failing one by one. \n"
+      "Captain Elias sat in the dim cockpit, staring at the blinking distress beacon. It had been "
+      "\n"
+      "three days since the engine failure. No response. No signs of life. Just the endless "
+      "black.\n"
+      "He tapped the cracked screen of the communicator. Static. His crew was gone, lost to the \n"
+      "malfunction that had turned Aurora into a metal coffin. He refused to die in silence.\n"
+      "With the last of the ship's energy, he boosted the beacon's range and spoke:\n"
+      "\"This is Captain Elias of the Aurora. If anyone is out there... I won't last much longer.\n"
+      "But if you hear this, know that I was here. I existed.\"\n"
+      "He leaned back, exhaling slowly. Then, just as the power flickered out—\n"
+      "A response.\n"
+      "\"Captain Elias, we hear you. Hold on.\"\n"
+      "A smile formed as darkness embraced him. He wasn't alone after all.";
+
+  CDEFMT_INFO("A very long dynamic string: {really_long_string:s}",
+              CDEFMT_DYNAMIC_STRING(really_long_string));
+
+#if defined(CDEFMT_USE_STACK_LOG_BUFFER) && CDEFMT_USE_STACK_LOG_BUFFER
+  CDEFMT_INFO("Using stack buffer, truncated to " BOOST_PP_STRINGIZE(CDEFMT_STACK_LOG_BUFFER_DYNAMIC_SIZE_MAX) " bytes");
+#endif /* defined (CDEFMT_USE_STACK_LOG_BUFFER) && CDEFMT_USE_STACK_LOG_BUFFER */
+
+#if defined(CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER
+  CDEFMT_INFO("Using static buffer, truncated to  " BOOST_PP_STRINGIZE(CDEFMT_STATIC_LOG_BUFFER_SIZE) " bytes");
+#endif /* defined (CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER */
+
+#if defined(CDEFMT_USE_DYNAMIC_LOG_BUFFER) && CDEFMT_USE_DYNAMIC_LOG_BUFFER
+  CDEFMT_INFO("Using dynamic buffer, no truncation");
+#endif /* defined (CDEFMT_USE_DYNAMIC_LOG_BUFFER) && CDEFMT_USE_DYNAMIC_LOG_BUFFER */
+
   free(dynamic_struct);
+
+#if defined(CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER
+  pthread_mutex_destroy(&cdefmt_global_buffer_lock);
+#endif /* defined (CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER */
 
   return 0;
 }
