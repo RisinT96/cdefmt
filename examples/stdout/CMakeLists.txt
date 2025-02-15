@@ -3,6 +3,8 @@ add_executable(example-stdout
     linkerscript.ld
 )
 
+target_include_directories(example-stdout PRIVATE .)
+
 target_link_libraries(example-stdout
     PRIVATE
         cdefmt

@@ -1,0 +1,6 @@
+#ifndef CDEFMT_CONFIG_H
+#define CDEFMT_CONFIG_H
+
+#define CDEFMT_DYNAMIC_MAX_SIZE 128
+
+#endif /* CDEFMT_CONFIG_H */

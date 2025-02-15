@@ -1,11 +1,10 @@
+#include <cdefmt/include/cdefmt.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-#include "cdefmt/include/cdefmt.h"
 
 typedef struct some_struct {
   uint64_t a;

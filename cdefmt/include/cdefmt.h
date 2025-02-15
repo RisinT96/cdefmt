@@ -1,6 +1,7 @@
 #ifndef CDEFMT_H
 #define CDEFMT_H
 
+#include <config/cdefmt_config.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -9,7 +10,6 @@
 #include "boost/preprocessor/seq/pop_front.hpp"
 #include "boost/preprocessor/stringize.hpp"
 #include "boost/preprocessor/variadic/to_seq.hpp"
-#include "boost/vmd/equal.hpp"
 #include "boost/vmd/is_tuple.hpp"
 
 /* Inner mechanisms */
@@ -24,10 +24,6 @@
 
 static inline int cdefmt_init();
 #define CDEFMT_GENERATE_INIT() __CDEFMT_GENERATE_INIT()
-
-#ifndef CDEFMT_DYNAMIC_MAX_SIZE
-#define CDEFMT_DYNAMIC_MAX_SIZE 128
-#endif
 
 enum cdefmt_level {
   CDEFMT_LEVEL_ERR = __CDEFMT_LEVEL_ERR,
@@ -60,6 +56,12 @@ enum cdefmt_level {
  * The implementation has to write the `log` into the log backends used by the project.
  */
 void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
+
+/* ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡ Default config ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡ */
+
+#ifndef CDEFMT_DYNAMIC_MAX_SIZE
+#define CDEFMT_DYNAMIC_MAX_SIZE 128
+#endif /* CDEFMT_DYNAMIC_MAX_SIZE */
 
 /* ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡ Private APIs ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡ */
 

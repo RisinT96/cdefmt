@@ -12,7 +12,8 @@ Inspired by <https://github.com/knurling-rs/defmt/>
 - [4. Usage](#4-usage)
   - [4.1. Example](#41-example)
   - [4.2. Setup](#42-setup)
-    - [4.2.1. c](#421-c)
+    - [4.2.1. Dependencies](#421-dependencies)
+    - [4.2.2. Integration](#422-integration)
 - [5. Technical Details](#5-technical-details)
   - [5.1. Generation](#51-generation)
   - [5.2. Metadata](#52-metadata)
@@ -84,7 +85,15 @@ This has 2 advantages:
 
 ## 4.2. Setup
 
-### 4.2.1. c
+### 4.2.1. Dependencies
+
+`cdefmt` is a header only library, implemented using mostly macros, however, it's dependent on the boost preprocessor and VMD libraries.
+These are header only libraries compatible with c and c++.
+
+If working with CMake, and linking with the `cdefmt` library, you should automatically get the required dependencies.
+Otherwise you'll have to provide your own, using your build system.
+
+### 4.2.2. Integration
 
 1.  cdefmt encodes the log strings along with some metadata into a special section in the elf binary, we need to modify the project's linker script to generate that section:<br>
     Add the cdefmt metadata section to the end of the linker script (or right before `/DISCARD/` if it exists):
@@ -96,7 +105,7 @@ This has 2 advantages:
         KEEP(*(.cdefmt .cdefmt.*))
     }
     ```
-2.  cdefmt uses the build-id to uniqely identify an elf file, and validate the compatibility of the parsed logs with the supplied elf:<br>
+2.  cdefmt uses the GNU build-id to uniquely identify an elf file, and validate the compatibility of the parsed logs with the supplied elf:<br>
     Update (or add if it doesn't exist) the `.note.gnu.build-id` section:
     ```
     .note.gnu.build-id : {
@@ -107,12 +116,24 @@ This has 2 advantages:
 3.  Compile with the following flags:
     * `-g`              - cdefmt uses debugging information to parse log arguments.
     * `-Wl,--build-id`  - link the build-id into the binary.
-4.  Add the header [`cdefmt.h`](cdefmt/include/cdefmt.h) to your project.
-5.  Include the header wherever you want to use it.
-6.  Implement [cdefmt_log](cdefmt/include/cdefmt.h#L47) to forward the logs to your logging backend.
-7.  Call [CDEFMT_GENERATE_INIT](cdefmt/include/cdefmt.h#L21) outside of a function scope.
-8.  Call [cdefmt_init](cdefmt/include/cdefmt.h#L20) after your logging backend is initialized and `cdefmt_log` can be safely called.
-9.  Enjoy.
+4.  Copy the header [`cdefmt_config.h`](cdefmt/config/cdefmt_config.h) to your project, place it in a `config` directory, and make sure that your project has it in it's include path.
+
+    Example project structure:
+    ```
+    project_root
+    ├── src
+    │   └── main.c
+    └── include
+        ├── config/cdefmt_config.h
+        └── some_header.h
+    ```
+    Make sure that `proect_root/include` is your project's include path, as `cdefmt.h` is looking for a `config/cdefmt_config.h` include file.
+5.  Update your copy of `cdefmt_config.h` to reflect your desired configuration.
+6.  Include [`cdefmt.h`](cdefmt/include/cdefmt.h) to use the logger.
+8.  Implement [cdefmt_log](cdefmt/include/cdefmt.h#L59) to forward the logs to your logging backend.
+9.  Call [CDEFMT_GENERATE_INIT](cdefmt/include/cdefmt.h#L27) outside of a function scope.
+10. Call [cdefmt_init](cdefmt/include/cdefmt.h#L26) after your logging backend is initialized and `cdefmt_log` can be safely called.
+11. Enjoy.
 
 See [example project](examples/stdout/) for reference.
 
