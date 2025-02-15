@@ -48,43 +48,42 @@ impl std::fmt::Display for Log {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut index = 0;
 
+        let args = self.args.as_deref().unwrap_or(&[]);
+
         for fragment in self.get_format_fragments() {
             match fragment {
                 FormatStringFragment::Parameter(parameter) => {
-                    if self.args.is_none() {
-                        return write!(f, "{{}}");
-                    }
-
-                    let args = self.args.as_ref().unwrap();
-
-                    if args.is_empty() {
-                        return write!(f, "{{}}");
-                    }
-
                     let var = match parameter.position {
                         Some(ParameterPosition::Positional(position)) => {
-                            &args[position % args.len()]
+                            if position >= args.len() {
+                                write!(f, "{{No positional parameter at index {position}}}")?;
+                                continue;
+                            }
+
+                            &args[position]
                         }
                         Some(ParameterPosition::Named(name)) => {
                             if let Some(pos) = self.metadata.names.iter().position(|n| n == name) {
                                 &args[pos]
                             } else {
-                                write!(f, "{{Unknown named parameter: {name}}}")?;
+                                write!(f, "{{No named parameter '{name}'}}")?;
                                 continue;
                             }
                         }
                         None => {
+                            if index >= args.len() {
+                                write!(f, "{{No parameter at index {index}}}")?;
+                                continue;
+                            }
+
                             let res = &args[index];
                             index += 1;
-                            index %= args.len();
                             res
                         }
                     };
                     write!(f, "{}", var.format(&parameter.hint))?
                 }
-                FormatStringFragment::Error(literal, error) => {
-                    write!(f, "{literal} ({error})")?
-                }
+                FormatStringFragment::Error(literal, error) => write!(f, "{literal} ({error})")?,
                 FormatStringFragment::Escaped(character) => write!(f, "{}", character)?,
                 FormatStringFragment::Literal(literal) => write!(f, "{}", literal)?,
             }
