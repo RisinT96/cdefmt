@@ -3,7 +3,7 @@
 
 /* ======================================== Stack Buffer ======================================== */
 
-#define CDEFMT_USE_STACK_LOG_BUFFER 0
+#define CDEFMT_USE_STACK_LOG_BUFFER 1
 
 #if defined(CDEFMT_USE_STACK_LOG_BUFFER) && CDEFMT_USE_STACK_LOG_BUFFER
 #define CDEFMT_STACK_LOG_BUFFER_DYNAMIC_SIZE_MAX 128
@@ -45,7 +45,7 @@ extern pthread_mutex_t cdefmt_global_buffer_lock;
  * - CDEFMT_DYNAMIC_LOG_BUFFER_ALLOC(size_)
  * - CDEFMT_DYNAMIC_LOG_BUFFER_FREE()
  */
-#define CDEFMT_USE_DYNAMIC_LOG_BUFFER 1
+#define CDEFMT_USE_DYNAMIC_LOG_BUFFER 0
 
 #if defined(CDEFMT_USE_DYNAMIC_LOG_BUFFER) && CDEFMT_USE_DYNAMIC_LOG_BUFFER
 #include <stdlib.h>
