@@ -1,6 +1,9 @@
 #ifndef CDEFMT_H
 #define CDEFMT_H
 
+#if defined(__has_include) && __has_include(<assert.h>)
+#include <assert.h>
+#endif /* defined(__has_include) && __has_include(<assert.h>) */
 #include <config/cdefmt_config.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -80,10 +83,12 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_DYNAMIC_SIZE_MAX(counter_) \
   (CDEFMT_STATIC_LOG_BUFFER_SIZE - sizeof(struct CDEFMT_LOG_ARGS_T(counter_)))
 
-#define CDEFMT_GET_LOG_BUFFER(counter_, size_)                     \
-  ({                                                               \
-    CDEFMT_STATIC_LOG_BUFFER_LOCK();                               \
-    (struct CDEFMT_LOG_ARGS_T(counter_)*)CDEFMT_STATIC_LOG_BUFFER; \
+#define CDEFMT_GET_LOG_BUFFER(counter_, size_)                                                 \
+  ({                                                                                           \
+    static_assert(sizeof(struct CDEFMT_LOG_ARGS_T(counter_)) <= CDEFMT_STATIC_LOG_BUFFER_SIZE, \
+                  "Log doesn't fit into static buffer!");                                      \
+    CDEFMT_STATIC_LOG_BUFFER_LOCK();                                                           \
+    (struct CDEFMT_LOG_ARGS_T(counter_)*)CDEFMT_STATIC_LOG_BUFFER;                             \
   })
 #define CDEFMT_RELEASE_LOG_BUFFER(counter_) CDEFMT_STATIC_LOG_BUFFER_UNLOCK()
 
@@ -211,6 +216,10 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     __typeof__(b) _b = (b); \
     _a <= _b ? _a : _b;     \
   })
+
+#if !defined(static_assert)
+#define static_assert(cond_, message_) typedef char static_assertion_##__COUNTER__[(cond_) ? 1 : -1]
+#endif /* !defined(static_assert) */
 
 /* Need a level of indirection mainly to expand `__COUNTER__`, `__FILE__` and `__LINE__`
  * Additionally, for easier manipulation we're turning all the __VA_ARGS__ into a SEQ.
