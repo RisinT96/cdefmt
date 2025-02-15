@@ -20,8 +20,8 @@ pub enum Error {
     NoAttribute(gimli::DwAt),
     #[error("Unable to find requested compilation unit ({0}).")]
     NoCompilationUnit(String),
-    #[error("Nullterminator is missing from log string")]
-    NoNullTerm,
+    #[error("The log at id [{0}] has no null terminator!, error: {1}")]
+    NoNullTerm(usize, std::ffi::FromBytesUntilNulError),
     #[error("The elf is missing the following section: {0:?}")]
     NoSection(SectionId),
     #[error("Unable to find requested type ({0}).")]

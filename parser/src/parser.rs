@@ -47,11 +47,9 @@ impl<'data> Parser<'data> {
             return Err(Error::OutOfBounds(id, self.logs_section.len()));
         }
 
-        let json = &self.logs_section[id..]
-            .split(|b| *b == 0)
-            .next()
-            .ok_or(Error::NoNullTerm)?;
-        let json = std::str::from_utf8(json).map_err(|e| Error::Utf8(id, e))?;
+        let json = std::ffi::CStr::from_bytes_until_nul(&self.logs_section[id..])
+            .map_err(|e| Error::NoNullTerm(id, e))?;
+        let json = json.to_str().map_err(|e| Error::Utf8(id, e))?;
         let schema: SchemaVersion = serde_json::from_str(json)?;
 
         let mut metadata = match schema.version {
