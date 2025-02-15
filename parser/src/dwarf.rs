@@ -28,7 +28,7 @@ macro_rules! some {
 /// Contains an uncompressed dwarf and it's endianness.
 #[derive(Debug)]
 pub(crate) struct Dwarf<'data> {
-    dwarf: gimli::Dwarf<Cow<'data, [u8]>>,
+    dwarf_sections: gimli::DwarfSections<Cow<'data, [u8]>>,
     endian: gimli::RunTimeEndian,
 }
 
@@ -44,18 +44,22 @@ impl<'data> Dwarf<'data> {
         // We want the uncompressed sections, this returns a [`Cow`] that we have to store somewhere
         // for future use.
         // Unfortunately it's impossible to directly convert this Cow into an EndianSlice and store
-        // only the endian slice, so we'll have to perform the conversion every time we need.
+        // only the endian slice, so we'll have to perform the conversion every time we need an
+        // endian slice.
         let load_section = |id: gimli::SectionId| -> Result<std::borrow::Cow<[u8]>> {
-            match file.section_by_name(id.name()) {
-                Some(ref section) => Ok(section.uncompressed_data()?),
-                None => Ok(std::borrow::Cow::Borrowed(&[][..])),
-            }
+            Ok(match file.section_by_name(id.name()) {
+                Some(ref section) => section.uncompressed_data()?,
+                None => std::borrow::Cow::Borrowed(&[][..]),
+            })
         };
 
-        let dwarf = gimli::Dwarf::load(&load_section)?;
+        let dwarf_sections = gimli::DwarfSections::load(&load_section)?;
 
         // Load all of the sections.
-        Ok(Self { dwarf, endian })
+        Ok(Self {
+            dwarf_sections,
+            endian,
+        })
     }
 
     /// Returns the loaded dwarf's endianness.
@@ -88,7 +92,7 @@ impl<'data> Dwarf<'data> {
         let borrow_section =
             |section: &'data Cow<'_, [u8]>| gimli::EndianSlice::new(section, self.endian);
 
-        self.dwarf.borrow(&borrow_section)
+        self.dwarf_sections.borrow(&borrow_section)
     }
 }
 
@@ -353,7 +357,7 @@ fn parse_structure<R: Reader>(
         }
     }
 
-    Ok(Type::Structure{members, size})
+    Ok(Type::Structure { members, size })
 }
 
 fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<u64> {
