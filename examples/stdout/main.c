@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include "cdefmt/include/cdefmt.h"
@@ -174,7 +175,7 @@ int main(int argc, char* cargv[]) {
               some_f64, some_packed_struct, some_i64, some_unsigned_enum);
 
   // Handle user error
-  CDEFMT_INFO("HAHA I LIED! gave you no args at all! [{}, {}, {}, {}]");
+  CDEFMT_INFO("HAHA I LIED! gave you no args at all! [{}, {1}, {2}, {hey_bro}]");
   CDEFMT_INFO("HAHA I LIED! gave you less args than in format string! [{}, {}, {}, {}]", some_bool,
               some_signed_enum, u8_array);
 
@@ -187,6 +188,11 @@ int main(int argc, char* cargv[]) {
 
   // Quotes have to be double escaped.
   CDEFMT_INFO("Some string: \\\"{:s}\\\"", some_string);
+
+  char hidden_message[] = "I'm a hidden message!";
+  char string_in_big_array[40 + sizeof(hidden_message)] = "this is some string";
+  memcpy(string_in_big_array + 30, hidden_message, sizeof(hidden_message));
+  CDEFMT_INFO("hidden message: '{:s}'", string_in_big_array);
 
   CDEFMT_INFO("Named parameters: {some_f32} {some_struct.b} {1} {some_u16} {}", some_bool, some_u16,
               some_f32, some_struct.b);
@@ -219,7 +225,11 @@ int main(int argc, char* cargv[]) {
 
   struct_len++;
 
-  CDEFMT_INFO("Dynamic array ++ : {}", CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len));
+  CDEFMT_INFO("Dynamic array 2 : {}", CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len));
+
+  CDEFMT_INFO("Dynamic array: {}, dynamic string: '{:s}'",
+              CDEFMT_DYNAMIC_ARRAY(dynamic_struct, struct_len),
+              CDEFMT_DYNAMIC_STRING(dynamic_string));
 
   free(dynamic_struct);
 
