@@ -57,6 +57,23 @@ impl<'data> Decoder<'data> {
         Ok(log)
     }
 
+    /// Parses all logs in the elf and pre-caches their metadata and type
+    /// information, to speed up future log decoding.
+    /// This can also serve as a way to validate that all the logs encoded into
+    /// the file are valid and can be properly parsed.
+    pub fn precache_log_metadata(&mut self) -> Result<usize> {
+        let mut count = 0;
+
+        for bundle in self.parser.iter_logs() {
+            let (metadata, ty) = bundle?;
+
+            self.log_cache.insert(metadata.id, (metadata, ty));
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     // Parses the log's arguments.
     fn decode_log_args<R: Reader>(ty: &Type, mut data: R) -> Result<Vec<Var>> {
         let members = if let Type::Structure { members, .. } = ty {

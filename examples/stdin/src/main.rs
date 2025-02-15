@@ -20,7 +20,13 @@ fn main() -> std::result::Result<(), String> {
     let file = std::fs::File::open(args.elf).map_err(|e| e.to_string())?;
     let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| e.to_string())?;
 
-    let mut logger = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
+    let mut decoder = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
+
+    let start = std::time::Instant::now();
+    let count = decoder.precache_log_metadata().map_err(|e| e.to_string())?;
+    let duration = start.elapsed();
+
+    println!("Precached {count} logs in {}[ms]", duration.as_millis());
 
     let mut stdin = std::io::stdin();
 
@@ -34,7 +40,7 @@ fn main() -> std::result::Result<(), String> {
             .read_exact(buff.as_mut_slice())
             .map_err(|e| e.to_string())?;
 
-        let log = logger.decode_log(&buff);
+        let log = decoder.decode_log(&buff);
 
         match log {
             Ok(log) => println!("{:<7} > {}", log.get_level(), log),

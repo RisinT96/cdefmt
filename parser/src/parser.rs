@@ -62,6 +62,14 @@ impl<'data> Parser<'data> {
         Ok(metadata)
     }
 
+    /// Returns an iterator over all of the log's metadata/type information.
+    pub fn iter_logs(&self) -> MetadataIterator {
+        MetadataIterator {
+            parser: self,
+            pos: 0,
+        }
+    }
+
     /// Returns the type of the log's arguments.
     /// Return:
     /// * Ok(Some(_)) => The type of the arguments.
@@ -82,5 +90,45 @@ impl<'data> Parser<'data> {
 
     pub fn endian(&self) -> gimli::RunTimeEndian {
         self.dwarf.endian()
+    }
+}
+
+pub struct MetadataIterator<'data> {
+    parser: &'data Parser<'data>,
+    pos: usize,
+}
+
+impl<'data> Iterator for MetadataIterator<'data> {
+    type Item = Result<(Metadata, Option<Type>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos == self.parser.logs_section.len() {
+            return None;
+        }
+
+        let metadata = match self.parser.get_log_metadata(self.pos) {
+            Ok(m) => m,
+            Err(e) => return Some(Err(e)),
+        };
+
+        let ty = match self.parser.get_log_args_type(&metadata) {
+            Ok(t) => t,
+            Err(e) => return Some(Err(e)),
+        };
+
+        self.pos = self.parser.logs_section[self.pos..]
+            .iter()
+            // Find end of current metadata
+            .position(|c| *c == 0)
+            .and_then(|null_delimiter| {
+                self.parser.logs_section[self.pos + null_delimiter..]
+                    .iter()
+                    // Find start of next metadata
+                    .position(|c| *c != 0)
+                    .map(|new| self.pos + null_delimiter + new)
+            })
+            .unwrap_or_else(|| self.parser.logs_section.len());
+
+        Some(Ok((metadata, ty)))
     }
 }
