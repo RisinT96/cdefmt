@@ -74,6 +74,10 @@ impl<'data> Decoder<'data> {
         Ok(count)
     }
 
+    pub fn get_endianness(&self) -> gimli::RunTimeEndian {
+        self.parser.endian()
+    }
+
     // Parses the log's arguments.
     fn decode_log_args<R: Reader>(ty: &Type, mut data: R) -> Result<Vec<Var>> {
         let members = if let Type::Structure { members, .. } = ty {
@@ -88,9 +92,11 @@ impl<'data> Decoder<'data> {
         // Parse the raw data into `Var` representation.
         let mut decoded = members
             .iter()
-            // The dynamic data should be at the end, ignore it, we'll come back for it afterwards.
-            // Not all logs necessarily have it, so we skip by name, instead of outright ignoring
-            // the last element.
+            // Filter out the 'dynamic_data' member for now - this contains variable-length data
+            // that needs to be processed after parsing the fixed-size fields, since we need
+            // information from those fields to know how to interpret the dynamic data.
+            // The dynamic_data field is positioned at the end of the structure when present,
+            // but not all logs have it, so we filter by name rather than skipping the last element.
             .filter(|m| !matches!(m.name.as_str(), "dynamic_data"))
             .map(|m| Ok(Var::parse(&m.ty, &mut data)?.0))
             .collect::<Result<Vec<_>>>()?;

@@ -1,6 +1,7 @@
 #include <cdefmt/include/cdefmt.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -288,8 +289,11 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
   fstat(1, &stat);
 
   if (S_ISFIFO(stat.st_mode)) {
-    // Write raw binary data
-    fwrite(&size, sizeof(size), 1, stdout);
+    static_assert(sizeof(uint64_t) >= sizeof(size_t));
+    const uint64_t size_u64 = size;
+
+    // Write raw binary data as length value pairs.
+    fwrite(&size_u64, sizeof(size_u64), 1, stdout);
     fwrite(log, size, 1, stdout);
     return;
   }

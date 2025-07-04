@@ -1,6 +1,8 @@
 use std::{io::Read, path::PathBuf};
 
+use cdefmt_decoder;
 use clap::Parser;
+use gimli::Reader;
 
 /// Simple program to greet a person
 #[derive(clap::Parser, Debug)]
@@ -26,21 +28,27 @@ fn main() -> std::result::Result<(), String> {
     let count = decoder.precache_log_metadata().map_err(|e| e.to_string())?;
     let duration = start.elapsed();
 
-    println!("Precached {count} logs in {}[ms]", duration.as_millis());
+    println!("pre-cached {count} logs in {}[ms]", duration.as_millis());
+
+    let endianness = decoder.get_endianness();
+
+    // stdout example writes length-value pairs
+    // read the length, then use that to read the value.
 
     let mut stdin = std::io::stdin();
-
-    let mut len = [0; std::mem::size_of::<usize>()];
+    let mut len = [0; std::mem::size_of::<u64>()];
+    let mut buff = vec![0; 0];
 
     while stdin.read_exact(&mut len).is_ok() {
-        let len = usize::from_ne_bytes(len);
-        let mut buff = vec![0; len];
+        let len = gimli::EndianSlice::new(&len, endianness)
+            .read_u64()
+            .map_err(|e| e.to_string())? as usize;
 
-        stdin
-            .read_exact(buff.as_mut_slice())
-            .map_err(|e| e.to_string())?;
+        buff.resize(len, 0);
+        let current_buff = &mut buff[..len];
 
-        let log = decoder.decode_log(&buff);
+        stdin.read_exact(current_buff).map_err(|e| e.to_string())?;
+        let log = decoder.decode_log(current_buff);
 
         match log {
             Ok(log) => println!("{:<7} > {}", log.get_level(), log),
