@@ -169,7 +169,7 @@ int main(int argc, char* cargv[]) {
   uint8_t u8_array[] = {1, 2, 3, 4, 5};
   CDEFMT_INFO("u8 array: {}", u8_array);
 
-  // Up to 8 arguments
+  // Tons of arguments:
   CDEFMT_INFO("no args []");
   CDEFMT_INFO("1 arg:  [{}]", some_bool);
   CDEFMT_INFO("2 args: [{}, {}]", some_bool, some_i8);
@@ -183,20 +183,20 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("8 args: [{}, {}, {}, {}, {}, {}, {}, {}]", some_bool, some_i8, some_u8, some_f32,
               some_f64, some_packed_struct, some_i64, some_unsigned_enum);
 
-  // Handle user error
-  CDEFMT_INFO("HAHA I LIED! gave you no args at all! [{}, {1}, {2}, {hey_bro}]");
-  CDEFMT_INFO("HAHA I LIED! gave you less args than in format string! [{}, {}, {}, {}]", some_bool,
+  // No arguments provided
+  CDEFMT_INFO("These parameters have no arguments: [{}, {1}, {2}, {hey_bro}]");
+  CDEFMT_INFO("Requested 4 parameters but provided only 3: [{}, {}, {}, {}]", some_bool,
               some_signed_enum, u8_array);
 
-  // Of course can print same log with different values.
+  // Dynamic values with same log
   for (size_t i = 0; i < 10; i++) {
     CDEFMT_INFO("Iteration {}", i);
   }
 
   char some_string[] = "this is some string";
 
-  // Quotes have to be double escaped.
-  CDEFMT_INFO("Some string: \\\"{:s}\\\"", some_string);
+  // Double quotes have to be escaped.
+  CDEFMT_INFO("Some string: \"{:s}\"", some_string);
 
   char hidden_message[] = "I'm a hidden message!";
   char string_in_big_array[40 + sizeof(hidden_message)] = "this is some string";

@@ -23,6 +23,7 @@ impl fmt::Display for Level {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SchemaVersion {
+    #[serde(rename = "@version")]
     pub version: u32,
 }
 
@@ -30,11 +31,16 @@ pub(crate) struct SchemaVersion {
 pub struct Metadata {
     #[serde(skip)]
     pub id: usize,
+    #[serde(rename = "@counter")]
     pub counter: usize,
+    #[serde(rename = "@level")]
     pub level: Level,
+    #[serde(rename = "@file")]
     pub file: String,
+    #[serde(rename = "@line")]
     pub line: usize,
-    #[serde(rename = "message")]
-    pub format_string: String,
+    #[serde(rename = "@names")]
     pub names: Vec<String>,
+    #[serde(rename = "$text")]
+    pub format_string: String,
 }

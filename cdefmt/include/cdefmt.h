@@ -268,30 +268,29 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 
 /* ======================================= Metadata String ====================================== */
 
-#define __CDEFMT_GENERATE_METADATA_ARG_NAME(r_, _, i_, elem_)                                     \
-  /* Insert `,` before all elements that are not first */                                         \
-  BOOST_PP_IF(i_, ",", )                                                                          \
-  /* Insert stringified parameter surrounded by quotes */                                         \
-  "\"" BOOST_PP_IF(BOOST_VMD_IS_TUPLE(elem_),                                                     \
-                   __CDEFMT_GENERATE_METADATA_ARG_NAME_PARAMETER, /* Handle special parameters */ \
-                   BOOST_PP_STRINGIZE)                            /* Handle regular parameters */ \
-      (elem_) "\""
+#define __CDEFMT_GENERATE_METADATA_ARG_NAME(r_, _, i_, elem_)                                \
+  /* Insert ` ` before all elements that are not first */                                    \
+  BOOST_PP_IF(i_, " ", )                                                                     \
+  /* Insert stringified parameter */                                                         \
+  BOOST_PP_IF(BOOST_VMD_IS_TUPLE(elem_),                                                     \
+              __CDEFMT_GENERATE_METADATA_ARG_NAME_PARAMETER, /* Handle special parameters */ \
+              BOOST_PP_STRINGIZE)                            /* Handle regular parameters */ \
+  (elem_)
 
 #define CDEFMT_GENERATE_METADATA_ARG_NAMES(args_seq_) \
   BOOST_PP_SEQ_FOR_EACH_I(__CDEFMT_GENERATE_METADATA_ARG_NAME, _, args_seq_)
 
 #define CDEFMT_FORMAT_METADATA(counter_, level_, file_, line_, message_, args_seq_) \
-  "{"                                                                               \
-      "\"version\":"BOOST_PP_STRINGIZE(CDEFMT_SCHEMA_VERSION)","                    \
-      "\"counter\":"BOOST_PP_STRINGIZE(counter_)","                                 \
-      "\"level\":"BOOST_PP_STRINGIZE(level_)","                                     \
-      "\"file\":\""file_"\","                                                       \
-      "\"line\":"BOOST_PP_STRINGIZE(line_)","                                       \
-      "\"message\":\""message_"\","                                                 \
-      "\"names\": ["                                                                \
-          CDEFMT_GENERATE_METADATA_ARG_NAMES(args_seq_)                             \
-      "]"                                                                           \
-  "}"
+  "<Metadata "                                                                      \
+    "version='"BOOST_PP_STRINGIZE(CDEFMT_SCHEMA_VERSION)     "' "                   \
+    "counter='"BOOST_PP_STRINGIZE(counter_)                  "' "                   \
+    "level='"  BOOST_PP_STRINGIZE(level_)                    "' "                   \
+    "file='"   file_                                         "' "                   \
+    "line='"   BOOST_PP_STRINGIZE(line_)                     "' "                   \
+    "names='"  CDEFMT_GENERATE_METADATA_ARG_NAMES(args_seq_) "' "                   \
+  ">"                                                                               \
+    "<![CDATA["message_"]]>"                                                        \
+  "</Metadata>"
 
 /* Generates entire metadata string variable */
 #define CDEFMT_GENERATE_METADATA_STRING(counter_, level_, file_, line_, message_, args_seq_) \

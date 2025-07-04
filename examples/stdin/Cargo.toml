@@ -1,11 +1,11 @@
 [package]
 name = "stdin"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cdefmt-decoder = { path = "../../decoder", version = "0.4.0" }
+cdefmt-decoder = { path = "../../decoder", version = "0.5.0" }
 clap = { version = "4.5", features = ["derive"] }
 memmap2 = "0.9"

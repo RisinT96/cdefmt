@@ -47,13 +47,13 @@ impl<'data> Parser<'data> {
             return Err(Error::OutOfBounds(id, self.logs_section.len()));
         }
 
-        let json = std::ffi::CStr::from_bytes_until_nul(&self.logs_section[id..])
+        let raw = std::ffi::CStr::from_bytes_until_nul(&self.logs_section[id..])
             .map_err(|e| Error::NoNullTerm(id, e))?;
-        let json = json.to_str().map_err(|e| Error::Utf8(id, e))?;
-        let schema: SchemaVersion = serde_json::from_str(json)?;
+        let xml = raw.to_str().map_err(|e| Error::Utf8(id, e))?;
+        let schema: SchemaVersion = quick_xml::de::from_str(xml)?;
 
         let mut metadata = match schema.version {
-            1 => serde_json::from_str::<Metadata>(json),
+            1 => quick_xml::de::from_str::<Metadata>(xml),
             _ => return Err(Error::SchemaVersion(schema.version)),
         }?;
 

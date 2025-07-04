@@ -12,8 +12,8 @@ pub use parser::Parser;
 pub enum Error {
     #[error("Gimli error: {0}")]
     Gimli(#[from] gimli::Error),
-    #[error("Json error: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("XML error: {0}")]
+    XML(#[from] quick_xml::DeError),
     #[error("The provided elf is missing the '.cdefmt' section.")]
     MissingSection,
     #[error("DIE is missing attribute {0}")]
