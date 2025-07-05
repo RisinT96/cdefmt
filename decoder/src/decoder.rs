@@ -13,14 +13,14 @@ use object::ReadRef;
 use crate::{log::Log, var::Var, Error, Result};
 
 /// Responsible for parsing logs from the elf.
-pub struct Decoder<'data> {
-    parser: Parser<'data>,
-    log_cache: HashMap<usize, (Metadata, Option<Type>)>,
+pub struct Decoder<'elf> {
+    parser: Parser<'elf>,
+    log_cache: HashMap<usize, (Metadata<'elf>, Option<Type>)>,
 }
 
-impl<'data> Decoder<'data> {
+impl<'elf> Decoder<'elf> {
     /// Creates a new Parser from elf data.
-    pub fn new<R: ReadRef<'data>>(data: R) -> Result<Self> {
+    pub fn new<R: ReadRef<'elf>>(data: R) -> Result<Self> {
         Ok(Decoder {
             parser: Parser::new(data)?,
             log_cache: Default::default(),
@@ -28,7 +28,7 @@ impl<'data> Decoder<'data> {
     }
 
     /// Decodes a raw log
-    pub fn decode_log(&mut self, data: &[u8]) -> Result<Log> {
+    pub fn decode_log(&mut self, data: &[u8]) -> Result<Log<'elf>> {
         let mut data = gimli::EndianSlice::new(data, self.parser.endian());
         let id = data.read_address(self.parser.address_size().bytes())? as usize;
 
@@ -62,16 +62,16 @@ impl<'data> Decoder<'data> {
     /// This can also serve as a way to validate that all the logs encoded into
     /// the file are valid and can be properly parsed.
     pub fn precache_log_metadata(&mut self) -> Result<usize> {
-        let mut count = 0;
+        self.log_cache = self
+            .parser
+            .iter_logs()
+            .map(|l| {
+                let (metadata, ty) = l?;
+                Ok((metadata.id, (metadata, ty)))
+            })
+            .collect::<Result<_>>()?;
 
-        for bundle in self.parser.iter_logs() {
-            let (metadata, ty) = bundle?;
-
-            self.log_cache.insert(metadata.id, (metadata, ty));
-            count += 1;
-        }
-
-        Ok(count)
+        Ok(self.log_cache.len())
     }
 
     pub fn get_endianness(&self) -> gimli::RunTimeEndian {

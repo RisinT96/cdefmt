@@ -1,6 +1,5 @@
 use std::{io::Read, path::PathBuf};
 
-use cdefmt_decoder;
 use clap::Parser;
 use gimli::Reader;
 
@@ -22,9 +21,8 @@ fn main() -> std::result::Result<(), String> {
     let file = std::fs::File::open(args.elf).map_err(|e| e.to_string())?;
     let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| e.to_string())?;
 
-    let mut decoder = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
-
     let start = std::time::Instant::now();
+    let mut decoder = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
     let count = decoder.precache_log_metadata().map_err(|e| e.to_string())?;
     let duration = start.elapsed();
 
@@ -54,8 +52,6 @@ fn main() -> std::result::Result<(), String> {
             Ok(log) => println!("{:<7} > {}", log.get_level(), log),
             Err(e) => println!("Err: {}", e),
         }
-
-        buff.clear();
     }
 
     Ok(())
