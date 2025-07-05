@@ -13,13 +13,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct Log {
-    metadata: Metadata,
+pub struct Log<'elf> {
+    metadata: Metadata<'elf>,
     args: Option<Vec<Var>>,
 }
 
-impl Log {
-    pub(crate) fn new(metadata: Metadata, args: Option<Vec<Var>>) -> Self {
+impl<'elf> Log<'elf> {
+    pub(crate) fn new(metadata: Metadata<'elf>, args: Option<Vec<Var>>) -> Self {
         Self { metadata, args }
     }
 
@@ -28,7 +28,7 @@ impl Log {
     }
 
     pub fn get_file(&self) -> &str {
-        &self.metadata.file
+        self.metadata.file
     }
 
     pub fn get_line(&self) -> usize {
@@ -40,11 +40,11 @@ impl Log {
     }
 
     fn get_format_fragments(&self) -> FormatStringFragmentIterator {
-        FormatStringFragmentIterator::new(&self.metadata.format_string)
+        FormatStringFragmentIterator::new(self.metadata.fmt)
     }
 }
 
-impl std::fmt::Display for Log {
+impl std::fmt::Display for Log<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut index = 0;
 
@@ -63,7 +63,7 @@ impl std::fmt::Display for Log {
                             &args[position]
                         }
                         Some(ParameterPosition::Named(name)) => {
-                            if let Some(pos) = self.metadata.names.iter().position(|n| n == name) {
+                            if let Some(pos) = self.metadata.names.iter().position(|&n| n == name) {
                                 &args[pos]
                             } else {
                                 write!(f, "{{No named parameter '{name}'}}")?;

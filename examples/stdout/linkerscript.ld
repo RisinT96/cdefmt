@@ -263,7 +263,6 @@ SECTIONS
   /* CDEFMT: logs section */
   .cdefmt 0 (INFO) : {
     KEEP(*(.cdefmt.init .cdefmt.init.*))
-    . = . + 8;
     KEEP(*(.cdefmt .cdefmt.*))
   }
   /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }

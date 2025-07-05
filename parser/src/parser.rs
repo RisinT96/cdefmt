@@ -1,25 +1,26 @@
 //! Contains logic related to finding logs in the elf and parsing them.
 
-use object::{AddressSize, Object, ObjectSection, ReadRef};
+use object::{AddressSize, Object, ObjectSection, ObjectSymbol, ReadRef};
 
 use crate::{
     dwarf::Dwarf,
-    metadata::{Metadata, SchemaVersion},
+    metadata::{parse_metadata, Metadata},
     r#type::Type,
     Error, Result,
 };
 
 /// Responsible for parsing logs from the elf.
-pub struct Parser<'data> {
-    logs_section: &'data [u8],
-    build_id: &'data [u8],
-    dwarf: Dwarf<'data>,
+pub struct Parser<'elf> {
+    logs_section: &'elf [u8],
+    build_id: &'elf [u8],
+    dwarf: Dwarf<'elf>,
     address_size: AddressSize,
+    metadata_addresses: Vec<u64>,
 }
 
-impl<'data> Parser<'data> {
+impl<'elf> Parser<'elf> {
     /// Creates a new Parser from elf data.
-    pub fn new<R: ReadRef<'data>>(data: R) -> Result<Self> {
+    pub fn new<R: ReadRef<'elf>>(data: R) -> Result<Self> {
         let file = object::File::parse(data)?;
         let dwarf = Dwarf::new(&file)?;
         let build_id = file
@@ -30,6 +31,12 @@ impl<'data> Parser<'data> {
             "Unsupported architecture, no address size information!",
         ))?;
 
+        let metadata_addresses = file
+            .symbols()
+            .filter(|s| s.name().is_ok_and(|n| n.contains("cdefmt_log_metadata")))
+            .map(|s| s.address())
+            .collect::<Vec<_>>();
+
         Ok(Parser {
             logs_section: file
                 .section_by_name(".cdefmt")
@@ -38,35 +45,20 @@ impl<'data> Parser<'data> {
             build_id,
             dwarf,
             address_size,
+            metadata_addresses,
         })
     }
 
     /// Returns a specific log's metadata.
-    pub fn get_log_metadata(&self, id: usize) -> Result<Metadata> {
-        if id >= self.logs_section.len() {
-            return Err(Error::OutOfBounds(id, self.logs_section.len()));
-        }
-
-        let raw = std::ffi::CStr::from_bytes_until_nul(&self.logs_section[id..])
-            .map_err(|e| Error::NoNullTerm(id, e))?;
-        let xml = raw.to_str().map_err(|e| Error::Utf8(id, e))?;
-        let schema: SchemaVersion = quick_xml::de::from_str(xml)?;
-
-        let mut metadata = match schema.version {
-            1 => quick_xml::de::from_str::<Metadata>(xml),
-            _ => return Err(Error::SchemaVersion(schema.version)),
-        }?;
-
-        metadata.id = id;
-
-        Ok(metadata)
+    pub fn get_log_metadata(&self, id: usize) -> Result<Metadata<'elf>> {
+        parse_metadata(self.logs_section, id, self.endian())
     }
 
     /// Returns an iterator over all of the log's metadata/type information.
-    pub fn iter_logs(&self) -> MetadataIterator {
-        MetadataIterator {
+    pub fn iter_logs<'parser>(&'parser self) -> LogIterator<'parser, 'elf> {
+        LogIterator {
             parser: self,
-            pos: 0,
+            symbol_addr_iterator: self.metadata_addresses.iter(),
         }
     }
 
@@ -77,10 +69,10 @@ impl<'data> Parser<'data> {
     /// * Err(_)      => Encountered some error while parsing the dwarf.
     pub fn get_log_args_type(&self, metadata: &Metadata) -> Result<Option<Type>> {
         let type_name = format!("cdefmt_log_args_t{}", metadata.counter);
-        self.dwarf.get_type(&metadata.file, &type_name)
+        self.dwarf.get_type(metadata.file, &type_name)
     }
 
-    pub fn build_id(&self) -> &'data [u8] {
+    pub fn build_id(&self) -> &'elf [u8] {
         self.build_id
     }
 
@@ -93,41 +85,30 @@ impl<'data> Parser<'data> {
     }
 }
 
-pub struct MetadataIterator<'data> {
-    parser: &'data Parser<'data>,
-    pos: usize,
+pub struct LogIterator<'parser, 'elf>
+where
+    'elf: 'parser,
+{
+    parser: &'parser Parser<'elf>,
+    symbol_addr_iterator: std::slice::Iter<'parser, u64>,
 }
 
-impl<'data> Iterator for MetadataIterator<'data> {
-    type Item = Result<(Metadata, Option<Type>)>;
+impl<'elf> Iterator for LogIterator<'_, 'elf> {
+    type Item = Result<(Metadata<'elf>, Option<Type>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos == self.parser.logs_section.len() {
-            return None;
-        }
-
-        let metadata = match self.parser.get_log_metadata(self.pos) {
-            Ok(m) => m,
-            Err(e) => return Some(Err(e)),
+        let metadata = match self.symbol_addr_iterator.next() {
+            Some(&addr) => match self.parser.get_log_metadata(addr as usize) {
+                Ok(m) => m,
+                Err(e) => return Some(Err(e)),
+            },
+            None => return None,
         };
 
         let ty = match self.parser.get_log_args_type(&metadata) {
             Ok(t) => t,
             Err(e) => return Some(Err(e)),
         };
-
-        self.pos = self.parser.logs_section[self.pos..]
-            .iter()
-            // Find end of current metadata
-            .position(|c| *c == 0)
-            .and_then(|null_delimiter| {
-                self.parser.logs_section[self.pos + null_delimiter..]
-                    .iter()
-                    // Find start of next metadata
-                    .position(|c| *c != 0)
-                    .map(|new| self.pos + null_delimiter + new)
-            })
-            .unwrap_or_else(|| self.parser.logs_section.len());
 
         Some(Ok((metadata, ty)))
     }

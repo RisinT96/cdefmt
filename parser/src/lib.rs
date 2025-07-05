@@ -12,8 +12,6 @@ pub use parser::Parser;
 pub enum Error {
     #[error("Gimli error: {0}")]
     Gimli(#[from] gimli::Error),
-    #[error("XML error: {0}")]
-    XML(#[from] quick_xml::DeError),
     #[error("The provided elf is missing the '.cdefmt' section.")]
     MissingSection,
     #[error("DIE is missing attribute {0}")]
@@ -26,7 +24,7 @@ pub enum Error {
     NoSection(SectionId),
     #[error("Unable to find requested type ({0}).")]
     NoType(String),
-    #[error("Provided log id [{0}] is larger than the '.cdefmt' section [{1}]")]
+    #[error("Provided log at ID [{0}] metadata exceeds the '.cdefmt' section [{1}]")]
     OutOfBounds(usize, usize),
     #[error("Failed extract data from the '.cdefmt' section, error: {0}")]
     SectionData(#[from] object::Error),

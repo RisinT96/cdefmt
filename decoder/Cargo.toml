@@ -14,7 +14,4 @@ gimli = "0.31"
 object = "0.36"
 lazy-regex = "3.4"
 cdefmt-parser = { path = "../parser", version = "0.5.0" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_repr = "0.1"
 thiserror = "2.0"

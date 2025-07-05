@@ -27,14 +27,14 @@ macro_rules! some {
 
 /// Contains an uncompressed dwarf and it's endianness.
 #[derive(Debug)]
-pub(crate) struct Dwarf<'data> {
-    dwarf_sections: gimli::DwarfSections<Cow<'data, [u8]>>,
+pub(crate) struct Dwarf<'elf> {
+    dwarf_sections: gimli::DwarfSections<Cow<'elf, [u8]>>,
     endian: gimli::RunTimeEndian,
 }
 
-impl<'data> Dwarf<'data> {
+impl<'elf> Dwarf<'elf> {
     /// Creates a new [`Dwarf`]
-    pub(crate) fn new<R: ReadRef<'data>>(file: &File<'data, R>) -> Result<Self> {
+    pub(crate) fn new<R: ReadRef<'elf>>(file: &File<'elf, R>) -> Result<Self> {
         let endian = if file.is_little_endian() {
             gimli::RunTimeEndian::Little
         } else {
@@ -75,7 +75,7 @@ impl<'data> Dwarf<'data> {
     /// * Returns `Ok(None)` if the type cannot be found.
     /// * Returns `Err` if an error is encountered.
     pub(crate) fn get_type(
-        &'data self,
+        &'elf self,
         compilation_unit_name: &str,
         type_name: &str,
     ) -> Result<Option<Type>> {
@@ -87,10 +87,10 @@ impl<'data> Dwarf<'data> {
     }
 
     /// Converts self into an EndianSlice Dwarf.
-    fn borrow(&'data self) -> gimli::Dwarf<EndianSlice<'data, gimli::RunTimeEndian>> {
+    fn borrow(&'elf self) -> gimli::Dwarf<EndianSlice<'elf, gimli::RunTimeEndian>> {
         // Borrow a `Cow<[u8]>` to create an `EndianSlice`.
         let borrow_section =
-            |section: &'data Cow<'_, [u8]>| gimli::EndianSlice::new(section, self.endian);
+            |section: &'elf Cow<'_, [u8]>| gimli::EndianSlice::new(section, self.endian);
 
         self.dwarf_sections.borrow(&borrow_section)
     }
@@ -166,8 +166,10 @@ fn find_type_die<R: Reader>(
                         // Found our DIE.
                         return Ok(Some(entry.offset()));
                     }
+                }
 
-                    some!(entries.next_sibling()?);
+                if entries.next_sibling()?.is_none() {
+                    some!(entries.next_dfs()?);
                 }
             }
             // Continue to next entry (dfs).
