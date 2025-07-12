@@ -1,13 +1,13 @@
 [package]
-authors = ["Tal Risin"]
+authors.workspace = true
 description = "Parsing library for cdefmt log frames"
-edition = "2021"
-keywords = ["cdefmt", "defmt"]
-license = "MIT"
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
 name = "cdefmt-parser"
-readme = "../README.md"
-repository = "https://github.com/risint96/cdefmt"
-version = "0.5.0"
+readme.workspace = true
+repository.workspace = true
+version.workspace = true
 
 [dependencies]
 gimli = "0.31"
