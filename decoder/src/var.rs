@@ -3,10 +3,7 @@ use std::collections::BTreeMap;
 use cdefmt_parser::r#type::Type;
 use gimli::{Reader, ReaderOffset};
 
-use crate::{
-    format::{DisplayHint, DisplayType},
-    Result,
-};
+use crate::Result;
 
 #[derive(Debug, Clone)]
 pub enum Var {
@@ -36,103 +33,6 @@ pub enum Var {
 pub struct StructureMember {
     pub name: String,
     pub value: Var,
-}
-
-macro_rules! format_common {
-    // Width and precision
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        ::std::format!(
-            ::std::concat!("{:", $align, $sign, $alternate, $zero_pad, "w$", ".p$", $ty, "}"),
-            $val,
-            w = $width,
-            p = $precision
-        )
-    };
-    // Only width
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, "w", $width:ident, $ty: literal, $val:ident) => {
-        ::std::format!(
-            ::std::concat!("{:", $align, $sign, $alternate, $zero_pad, "w$", $ty, "}"),
-            $val,
-            w = $width
-        )
-    };
-    // Only precision
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, "p", $precision:ident, $ty: literal, $val:ident) => {
-        ::std::format!(
-            ::std::concat!("{:", $align, $sign, $alternate, $zero_pad, ".p$", $ty, "}"),
-            $val,
-            p = $precision
-        )
-    };
-    // No width nor precision
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, $ty: literal, $val:ident) => {
-        ::std::format!(
-            ::std::concat!("{:", $align, $sign, $alternate, $zero_pad, $ty, "}"),
-            $val
-        )
-    };
-}
-
-macro_rules! format_match {
-    // Match on width and precision
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:literal, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        match ($width, $precision) {
-            (None, None) => format_common!($align, $sign, $alternate, $zero_pad, $ty, $val),
-            (None, Some(p)) => {
-                format_common!($align, $sign, $alternate, $zero_pad, "p", p, $ty, $val)
-            }
-            (Some(w), None) => {
-                format_common!($align, $sign, $alternate, $zero_pad, "w", w, $ty, $val)
-            }
-            (Some(w), Some(p)) => {
-                format_common!($align, $sign, $alternate, $zero_pad, w, p, $ty, $val)
-            }
-        }
-    };
-    // Match on zero pad
-    ($align:literal, $sign:literal, $alternate:literal, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        match ($zero_pad) {
-            true => format_match!($align, $sign, $alternate, "0", $width, $precision, $ty, $val),
-            false => format_match!($align, $sign, $alternate, "", $width, $precision, $ty, $val),
-        }
-    };
-    // Match on alternate
-    ($align:literal, $sign:literal, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        match ($alternate) {
-            true => format_match!($align, $sign, "#", $zero_pad, $width, $precision, $ty, $val),
-            false => format_match!($align, $sign, "", $zero_pad, $width, $precision, $ty, $val),
-        }
-    };
-    // Match on sign
-    ($align:literal, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        match ($sign) {
-            true => {
-                format_match!($align, "+", $alternate, $zero_pad, $width, $precision, $ty, $val)
-            }
-            false => {
-                format_match!($align, "", $alternate, $zero_pad, $width, $precision, $ty, $val)
-            }
-        }
-    };
-    // Match on alignment
-    ($align:ident, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $precision:ident, $ty:literal, $val:ident) => {
-        match ($align) {
-            None => format_match!("", $sign, $alternate, $zero_pad, $width, $precision, $ty, $val),
-            Some(std::fmt::Alignment::Left) => {
-                format_match!("<", $sign, $alternate, $zero_pad, $width, $precision, $ty, $val)
-            }
-            Some(std::fmt::Alignment::Center) => {
-                format_match!("^", $sign, $alternate, $zero_pad, $width, $precision, $ty, $val)
-            }
-            Some(std::fmt::Alignment::Right) => {
-                format_match!(">", $sign, $alternate, $zero_pad, $width, $precision, $ty, $val)
-            }
-        }
-    };
-    // No precision
-    ($align:ident, $sign:ident, $alternate:ident, $zero_pad:ident, $width:ident, $ty:literal, $val:ident) => {
-        format_match!($align, $sign, $alternate, $zero_pad, $width, None, $ty, $val)
-    };
 }
 
 impl Var {
@@ -206,181 +106,13 @@ impl Var {
         })
     }
 
-    pub fn format(&self, hint: &DisplayHint) -> String {
-        match (self, &hint.ty) {
-            (Var::U8(val), &DisplayType::String) => {
-                String::from_utf8_lossy(&[*val]).to_string()
-            }
-            (Var::I8(val), &DisplayType::String) => {
-                String::from_utf8_lossy(&[*val as u8]).to_string()
-            }
-            (Var::Bool(true), _) => "true".to_string(),
-            (Var::Bool(false), _) => "false".to_string(),
-            (Var::U8(val), _) => Self::format_inner(val, hint),
-            (Var::U16(val), _) => Self::format_inner(val, hint),
-            (Var::U32(val), _) => Self::format_inner(val, hint),
-            (Var::U64(val), _) => Self::format_inner(val, hint),
-            (Var::I8(val), _) => Self::format_inner(val, hint),
-            (Var::I16(val), _) => Self::format_inner(val, hint),
-            (Var::I32(val), _) => Self::format_inner(val, hint),
-            (Var::I64(val), _) => Self::format_inner(val, hint),
-            (Var::F32(val), _) => Self::format_float(*val, hint),
-            (Var::F64(val), _) => Self::format_float(*val, hint),
-            (
-                Var::Enumeration {
-                    value,
-                    valid_values,
-                },
-                _,
-            ) => {
-                let value = match value.as_ref() {
-                    Var::U8(v) => *v as i128,
-                    Var::U16(v) => *v as i128,
-                    Var::U32(v) => *v as i128,
-                    Var::U64(v) => *v as i128,
-                    Var::I8(v) => *v as i128,
-                    Var::I16(v) => *v as i128,
-                    Var::I32(v) => *v as i128,
-                    Var::I64(v) => *v as i128,
-                    _ => unreachable!("C enums must have integer types!"),
-                };
-
-                valid_values
-                    .get(&value)
-                    .map(|name| name.to_owned())
-                    .unwrap_or_else(|| value.to_string())
-            }
-            (Var::Structure { members }, _) => {
-                let (start, join, end) = if hint.alternate {
-                    ("{\n\t", ",\n\t", "\n}")
-                } else {
-                    ("{", ", ", "}")
-                };
-                start.to_string()
-                    + &members
-                        .iter()
-                        .map(|m| format!("{}: {}", m.name, m.value.format(hint)))
-                        .collect::<Vec<_>>()
-                        .join(join)
-                    + end
-            }
-            (Var::Pointer(value), _) => {
-                // Override hints for pointer types.
-                let hint = DisplayHint {
-                    align: None,
-                    sign: false,
-                    alternate: true,
-                    zero_pad: false,
-                    width: None,
-                    precision: None,
-                    ty: DisplayType::Pointer,
-                };
-                value.format(&hint)
-            }
-            (Var::Array(values), _) => {
-                let (start, join, end) = match hint.ty {
-                    DisplayType::String => ("", "", ""),
-                    _ => ("[", ", ", "]"),
-                };
-
-                start.to_string()
-                    + &values
-                        .iter()
-                        .map(|v| v.format(hint))
-                        .collect::<Vec<_>>()
-                        .join(join)
-                    + end
-            }
-        }
-    }
-
-    fn format_inner<T>(val: T, hint: &DisplayHint) -> String
-    where
-        T: std::fmt::Binary
-            + std::fmt::Debug
-            + std::fmt::Display
-            + std::fmt::LowerExp
-            + std::fmt::LowerHex
-            + std::fmt::Octal
-            + std::fmt::UpperExp
-            + std::fmt::UpperHex,
-    {
-        let DisplayHint {
-            align,
-            sign,
-            alternate,
-            zero_pad,
-            width,
-            precision,
-            ty,
-        } = hint;
-
-        match ty {
-            DisplayType::Binary => format_match!(align, sign, alternate, zero_pad, width, "b", val),
-            DisplayType::Debug | DisplayType::Display => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "", val)
-            }
-            DisplayType::LowerExp => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "e", val)
-            }
-            DisplayType::LowerHex => {
-                format_match!(align, sign, alternate, zero_pad, width, "x", val)
-            }
-            DisplayType::Octal => format_match!(align, sign, alternate, zero_pad, width, "o", val),
-            DisplayType::Pointer => {
-                let width = Some(std::mem::size_of::<T>());
-                format_match!("", "", "#", "0", width, None, "x", val)
-            }
-            DisplayType::UpperExp => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "E", val)
-            }
-            DisplayType::UpperHex => {
-                format_match!(align, sign, alternate, zero_pad, width, "X", val)
-            }
-            _ => unreachable!("Unexpected hint: {:?}", ty),
-        }
-    }
-
-    fn format_float<F>(val: F, hint: &DisplayHint) -> String
-    where
-        F: std::fmt::Debug + std::fmt::Display + std::fmt::LowerExp + std::fmt::UpperExp,
-    {
-        let DisplayHint {
-            align,
-            sign,
-            alternate,
-            zero_pad,
-            width,
-            precision,
-            ty,
-        } = hint;
-
-        match ty {
-            DisplayType::Debug | DisplayType::Display => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "", val)
-            }
-            DisplayType::LowerExp => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "e", val)
-            }
-            DisplayType::UpperExp => {
-                format_match!(align, sign, alternate, zero_pad, width, precision, "E", val)
-            }
-            DisplayType::Binary => format!("Unable to format [{val}] as Binary!"),
-            DisplayType::LowerHex => format!("Unable to format [{val}] as LowerHex!"),
-            DisplayType::Octal => format!("Unable to format [{val}] as Octal!"),
-            DisplayType::String => format!("Unable to format [{val}] as String!"),
-            DisplayType::Pointer => format!("Unable to format [{val}] as Pointer!"),
-            DisplayType::UpperHex => format!("Unable to format [{val}] as UpperHex!"),
-        }
-    }
-
     pub fn as_u64(&self) -> u64 {
         match self {
             Var::Bool(v) => *v as u64,
             Var::U8(v) => *v as u64,
             Var::U16(v) => *v as u64,
             Var::U32(v) => *v as u64,
-            Var::U64(v) => *v ,
+            Var::U64(v) => *v,
             Var::I8(v) => *v as u64,
             Var::I16(v) => *v as u64,
             Var::I32(v) => *v as u64,
@@ -388,6 +120,282 @@ impl Var {
             Var::F32(v) => *v as u64,
             Var::F64(v) => *v as u64,
             _ => todo!("Should probably return an Option here or something"),
+        }
+    }
+
+    pub fn as_i128(&self) -> i128 {
+        match self {
+            Var::Bool(v) => *v as i128,
+            Var::U8(v) => *v as i128,
+            Var::U16(v) => *v as i128,
+            Var::U32(v) => *v as i128,
+            Var::U64(v) => *v as i128,
+            Var::I8(v) => *v as i128,
+            Var::I16(v) => *v as i128,
+            Var::I32(v) => *v as i128,
+            Var::I64(v) => *v as i128,
+            Var::F32(v) => *v as i128,
+            Var::F64(v) => *v as i128,
+            _ => todo!("Should probably return an Option here or something"),
+        }
+    }
+
+    fn format_as_string(&self) -> rformat::error::Result<String> {
+        match self {
+            Var::U8(v) => Ok(String::from_utf8_lossy(&[*v]).to_string()),
+            Var::I8(v) => Ok(String::from_utf8_lossy(&[*v as u8]).to_string()),
+            Var::Array(elements) => Ok(elements
+                .iter()
+                .map(|e| e.format_as_string())
+                .collect::<rformat::error::Result<Vec<_>>>()?
+                .join("")),
+            _ => Err(rformat::error::FormatError::Custom(format!(
+                "Can't format {:?} as string!",
+                self
+            ))),
+        }
+    }
+}
+
+macro_rules! format_enumeration {
+    ($f: expr, $value: expr, $valid_values: expr) => {{
+        let value = $value.as_i128();
+        if let Some(name) = $valid_values.get(&value) {
+            write!($f, "{}(", name)?;
+            value.fmt($f)?;
+            write!($f, ")")
+        } else {
+            write!($f, "Unknown(")?;
+            value.fmt($f)?;
+            write!($f, ")")
+        }
+    }};
+}
+
+macro_rules! format_structure {
+    ($f: expr, $members: expr) => {{
+        write!($f, "{{ ")?;
+        for (i, member) in $members.iter().enumerate() {
+            if i != 0 {
+                write!($f, ", ")?;
+            }
+
+            write!($f, "{}: ", member.name)?;
+            member.value.fmt($f)?;
+        }
+        write!($f, " }}")
+    }};
+}
+
+macro_rules! format_array {
+    ($f: expr, $elements: expr) => {{
+        write!($f, "[")?;
+        for (i, elem) in $elements.iter().enumerate() {
+            if i != 0 {
+                write!($f, ", ")?;
+            }
+            elem.fmt($f)?;
+        }
+        write!($f, "]")
+    }};
+}
+
+impl core::fmt::Binary for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as binary!", self),
+        }
+    }
+}
+
+/* Debug is implemented using derive */
+
+impl core::fmt::Display for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::Bool(v) => v.fmt(f),
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::F32(v) => v.fmt(f),
+            Var::F64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+        }
+    }
+}
+
+impl core::fmt::LowerExp for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::F32(v) => v.fmt(f),
+            Var::F64(v) => v.fmt(f),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as lower exponential!", self),
+        }
+    }
+}
+
+impl core::fmt::LowerHex for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as lower hexadecimal!", self),
+        }
+    }
+}
+
+impl core::fmt::Octal for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as octal!", self),
+        }
+    }
+}
+
+impl core::fmt::Pointer for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => ((*v) as *const u8).fmt(f),
+            Var::U16(v) => ((*v) as *const u16).fmt(f),
+            Var::U32(v) => ((*v) as *const u32).fmt(f),
+            Var::U64(v) => ((*v) as *const u64).fmt(f),
+            Var::I8(v) => ((*v) as *const i8).fmt(f),
+            Var::I16(v) => ((*v) as *const i16).fmt(f),
+            Var::I32(v) => ((*v) as *const i32).fmt(f),
+            Var::I64(v) => ((*v) as *const i64).fmt(f),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => (*inner).fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as pointer!", self),
+        }
+    }
+}
+
+impl core::fmt::UpperExp for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::F32(v) => v.fmt(f),
+            Var::F64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as upper exponential!", self),
+        }
+    }
+}
+
+impl core::fmt::UpperHex for Var {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Var::U8(v) => v.fmt(f),
+            Var::U16(v) => v.fmt(f),
+            Var::U32(v) => v.fmt(f),
+            Var::U64(v) => v.fmt(f),
+            Var::I8(v) => v.fmt(f),
+            Var::I16(v) => v.fmt(f),
+            Var::I32(v) => v.fmt(f),
+            Var::I64(v) => v.fmt(f),
+            Var::Enumeration {
+                value,
+                valid_values,
+            } => format_enumeration!(f, value, valid_values),
+            Var::Structure { members } => format_structure!(f, members),
+            Var::Pointer(inner) => inner.fmt(f),
+            Var::Array(elements) => format_array!(f, elements),
+            _ => write!(f, "Can't format {:?} as upper hexadecimal!", self),
+        }
+    }
+}
+
+impl rformat::fmt::Custom for Var {
+    fn format(
+        &self,
+        format_spec: &rformat::format_spec::FormatSpec,
+        _precision: Option<usize>,
+        _width: usize,
+        _parameter: &rformat::fmt::format::Parameter,
+    ) -> rformat::error::Result<String> {
+        match format_spec.r#type {
+            rformat::format_spec::Type::Custom("s") => self.format_as_string(),
+            _ => Err(rformat::error::FormatError::UnsupportedFormatType(
+                format_spec.r#type.to_str().to_string(),
+            )),
         }
     }
 }

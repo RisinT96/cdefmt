@@ -49,7 +49,11 @@ fn main() -> std::result::Result<(), String> {
         let log = decoder.decode_log(current_buff);
 
         match log {
-            Ok(log) => println!("{:<7} > {}", log.get_level(), log),
+            Ok(log) => println!(
+                "{:<7} > {}",
+                log.get_level(),
+                log.to_string().unwrap_or_else(|e| e.to_string())
+            ),
             Err(e) => println!("Err: {}", e),
         }
     }
