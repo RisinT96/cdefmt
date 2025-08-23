@@ -65,7 +65,7 @@ int main(int argc, char* cargv[]) {
   CDEFMT_DEBUG("This is a debug log.");
   CDEFMT_VERBOSE("This is a verbose log.");
 
-  CDEFMT_INFO("Escaped braces {{ }} } {{{{");
+  CDEFMT_INFO("Escaped braces {{ }} }}}} {{{{");
   CDEFMT_INFO("No closing brace { some text");
 
   // Different types
@@ -106,9 +106,10 @@ int main(int argc, char* cargv[]) {
   CDEFMT_INFO("sign     [{:+11}]", some_u32);
   CDEFMT_INFO("negative [{:+11}]", some_i32);
 
-  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f32);
-  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f64);
+  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f32, some_f32);
+  CDEFMT_INFO("Float precision [{:.3}] vs [{:<18}]", some_f64, some_f64);
 
+  CDEFMT_INFO("Debug    [{:?}]", some_u32);
   CDEFMT_INFO("Binary   [{:#40b}]", some_u32);
   CDEFMT_INFO("LowerExp [{:#40e}]", some_u32);
   CDEFMT_INFO("LowerHex [{:#40x}]", some_u32);

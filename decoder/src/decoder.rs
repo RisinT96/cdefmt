@@ -43,9 +43,9 @@ impl<'elf> Decoder<'elf> {
         let (metadata, ty) = self.log_cache.get(&id).unwrap();
 
         let args = if let Some(ty) = ty {
-            Some(Self::decode_log_args(ty, data)?)
+            Self::decode_log_args(ty, data)?
         } else {
-            None
+            vec![]
         };
 
         let log = Log::new(metadata.clone(), args);
@@ -116,13 +116,12 @@ impl<'elf> Decoder<'elf> {
 
     fn validate_init(&self, log: &Log) -> Result<()> {
         let args = log.get_args();
-        if args.is_none() {
+
+        if args.is_empty() {
             return Err(Error::Custom("No build ID argument information!"));
         }
 
-        let args = args.unwrap();
-
-        if let Some(Var::Array(build_id)) = args.first() {
+        if let Var::Array(build_id) = args.first().unwrap() {
             let build_id = build_id
                 .iter()
                 .map(|b| match b {

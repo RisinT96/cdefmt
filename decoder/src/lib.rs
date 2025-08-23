@@ -1,8 +1,7 @@
 use gimli::{DwAte, DwTag, SectionId};
 
-pub mod format;
-pub mod log;
 pub mod decoder;
+pub mod log;
 pub mod var;
 
 pub use decoder::Decoder;
@@ -13,6 +12,8 @@ pub enum Error {
     Gimli(#[from] gimli::Error),
     #[error("{0}")]
     Parser(#[from] cdefmt_parser::Error),
+    #[error("rformat error: {0}")]
+    RFormat(#[from] rformat::error::FormatError),
     #[error("The provided elf is missing the '.cdefmt' section.")]
     MissingSection,
     #[error("DIE is missing attribute {0}")]

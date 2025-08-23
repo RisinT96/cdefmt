@@ -391,7 +391,11 @@ struct cdefmt_build_id {
       uint8_t level;                                                                               \
       char file[sizeof(__FILE__)];                                                                 \
       char fmt[sizeof("cdefmt init, build-id: {}")];                                               \
-      struct {                                                                                     \
+      struct __attribute__((packed)) {                                                             \
+        struct __attribute__((packed)) {                                                           \
+          uint32_t len;                                                                            \
+          char name[sizeof("build_id")];                                                           \
+        } n0;                                                                                      \
       } names;                                                                                     \
     } CDEFMT_LOG_METADATA(counter_) __attribute__((section(".cdefmt.init"))) = {                   \
         .version = CDEFMT_SCHEMA_VERSION,                                                          \
@@ -399,11 +403,18 @@ struct cdefmt_build_id {
         .line = (__LINE__),                                                                        \
         .file_len = (sizeof(__FILE__)),                                                            \
         .fmt_len = (sizeof("cdefmt init, build-id: {}")),                                          \
-        .names_len = 0,                                                                            \
+        .names_len = 1,                                                                            \
         .level = (CDEFMT_LEVEL_ERR),                                                               \
         .file = (__FILE__),                                                                        \
         .fmt = ("cdefmt init, build-id: {}"),                                                      \
-        .names = {},                                                                               \
+        .names =                                                                                   \
+            {                                                                                      \
+                .n0 =                                                                              \
+                    {                                                                              \
+                        .len = sizeof("build_id"),                                                 \
+                        .name = ("build_id"),                                                      \
+                    },                                                                             \
+            },                                                                                     \
     };                                                                                             \
                                                                                                    \
     struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
