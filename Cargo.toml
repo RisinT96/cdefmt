@@ -9,4 +9,4 @@ keywords = ["cdefmt", "defmt"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/risint96/cdefmt"
-version = "0.6.0"
+version = "0.7.0"

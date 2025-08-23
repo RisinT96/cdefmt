@@ -12,7 +12,7 @@ version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cdefmt-decoder = { path = "../../decoder", version = "0.6.0" }
+cdefmt-decoder = { path = "../../decoder", version = "0.7.0" }
 clap = { version = "4.5", features = ["derive"] }
 gimli = "0.31"
 memmap2 = "0.9"
