@@ -10,9 +10,9 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
-gimli = "0.31"
-object = "0.36"
-lazy-regex = "3.4"
-cdefmt-parser = { path = "../parser", version = "0.7.0" }
-thiserror = "2.0"
-rformat = { git = "https://github.com/RisinT96/rformat.git", version = "0.2.0" }
+gimli.workspace = true
+object.workspace = true
+lazy-regex.workspace = true
+cdefmt-parser.workspace = true
+thiserror.workspace = true
+rformat.workspace = true
