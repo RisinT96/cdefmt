@@ -94,7 +94,7 @@ pub(crate) fn parse_metadata(
     cdefmt_section: &[u8],
     id: usize,
     endian: RunTimeEndian,
-) -> Result<Metadata> {
+) -> Result<Metadata<'_>> {
     let mut endian_slice = EndianSlice::new(cdefmt_section, endian);
 
     endian_slice
