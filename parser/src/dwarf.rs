@@ -383,6 +383,12 @@ fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>
         .udata_value()
         .ok_or(Error::BadAttribute)?;
 
+    // C++ doesn't really like zero-sized arrays as they're non-standard, it represents them with
+    // an upper bound of `-1`
+    if upper_bound == u64::MAX {
+        return Ok(0);
+    }
+
     Ok(1 + upper_bound - lower_bound)
 }
 

@@ -15,6 +15,17 @@
 #include "boost/preprocessor/variadic/to_seq.hpp"
 #include "boost/vmd/is_tuple.hpp"
 
+#if defined(__cplusplus)
+
+extern "C" {
+#define __CDEFMT_CAST(type, value) (static_cast<type>(value))
+
+#else /* defined(__cplusplus) */
+
+#define __CDEFMT_CAST(type, value) ((type)(value))
+
+#endif /* defined(__cplusplus) */
+
 /* Inner mechanisms */
 
 #define __CDEFMT_LEVEL_ERR 0
@@ -69,11 +80,17 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_DYNAMIC_SIZE_MAX_T         CDEFMT_STACK_LOG_BUFFER_DYNAMIC_SIZE_MAX
 #define CDEFMT_DYNAMIC_SIZE_MAX(counter_) CDEFMT_STACK_LOG_BUFFER_DYNAMIC_SIZE_MAX
 
-#define CDEFMT_GET_LOG_BUFFER(counter_, size_) (&(struct CDEFMT_LOG_ARGS_T(counter_)){0})
+// Return by value.
+#define CDEFMT_GET_LOG_BUFFER(counter_, size_) \
+  {                                            \
+  }
 #define CDEFMT_RELEASE_LOG_BUFFER(counter_)
 
+// Log args are stack allocated, addressed directly without indirection.
+#define CDEFMT_LOG_ARGS(counter_) __CDEFMT_LOG_ARGS(counter_)
+
 #define CDEFMT_GET_DYNAMIC_LOG_BUFFER_SIZE(counter_) \
-  (sizeof(*CDEFMT_LOG_ARGS(counter_)) - (CDEFMT_DYNAMIC_SIZE_MAX_T - cdefmt_dynamic_offset))
+  (sizeof(CDEFMT_LOG_ARGS(counter_)) - (CDEFMT_DYNAMIC_SIZE_MAX_T - cdefmt_dynamic_offset))
 
 #elif (defined(CDEFMT_USE_STATIC_LOG_BUFFER) && CDEFMT_USE_STATIC_LOG_BUFFER)
 
@@ -91,9 +108,12 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
     (struct CDEFMT_LOG_ARGS_T(counter_)*)CDEFMT_STATIC_LOG_BUFFER;                             \
   })
 #define CDEFMT_RELEASE_LOG_BUFFER(counter_) CDEFMT_STATIC_LOG_BUFFER_UNLOCK()
+//
+// Log args are statically allocated, addressed as a pointer.
+#define CDEFMT_LOG_ARGS(counter_)           (*__CDEFMT_LOG_ARGS(counter_))
 
 #define CDEFMT_GET_DYNAMIC_LOG_BUFFER_SIZE(counter_) \
-  (sizeof(*CDEFMT_LOG_ARGS(counter_)) + cdefmt_dynamic_size)
+  (sizeof(CDEFMT_LOG_ARGS(counter_)) + cdefmt_dynamic_size)
 
 #elif (defined(CDEFMT_USE_DYNAMIC_LOG_BUFFER) && CDEFMT_USE_DYNAMIC_LOG_BUFFER)
 
@@ -107,8 +127,11 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_RELEASE_LOG_BUFFER(counter_) \
   CDEFMT_DYNAMIC_LOG_BUFFER_FREE(CDEFMT_LOG_ARGS(counter_))
 
+// Log args are dynamically allocated, addressed as a pointer.
+#define CDEFMT_LOG_ARGS(counter_) (*__CDEFMT_LOG_ARGS(counter_))
+
 #define CDEFMT_GET_DYNAMIC_LOG_BUFFER_SIZE(counter_) \
-  (sizeof(*CDEFMT_LOG_ARGS(counter_)) + cdefmt_dynamic_size)
+  (sizeof(CDEFMT_LOG_ARGS(counter_)) + cdefmt_dynamic_size)
 
 #else
 
@@ -181,11 +204,11 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
       /* Minimum between array size, and how much space is left for dynamic data */               \
       cdefmt_increment = CDEFMT_MIN(sizeof(*(array_)) * (length_),                                \
                                     (CDEFMT_DYNAMIC_SIZE_MAX(counter_)) - cdefmt_dynamic_offset); \
-      memcpy(CDEFMT_LOG_ARGS(counter_)->dynamic_data + cdefmt_dynamic_offset, (array_),           \
+      memcpy(CDEFMT_LOG_ARGS(counter_).dynamic_data + cdefmt_dynamic_offset, (array_),            \
              cdefmt_increment);                                                                   \
       cdefmt_dynamic_offset += cdefmt_increment;                                                  \
     }                                                                                             \
-    (CDEFMT_LOG_ARGS(counter_))->dynamic_array_##i_.size = cdefmt_increment;                      \
+    (CDEFMT_LOG_ARGS(counter_)).dynamic_array_##i_.size = cdefmt_increment;                       \
   } while (0)
 
 #define __CDEFMT_ASSIGN_LOG_ARG_DYNAMIC_ARRAY(counter_, i_, dynamic_array_)                   \
@@ -207,7 +230,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_LOG_ARGS_T(counter_) BOOST_PP_CAT(cdefmt_log_args_t, counter_)
 
 /* Name of log arguments variable */
-#define CDEFMT_LOG_ARGS(counter_) BOOST_PP_CAT(cdefmt_log_args, counter_)
+#define __CDEFMT_LOG_ARGS(counter_) BOOST_PP_CAT(cdefmt_log_args, counter_)
 
 /* Returns minumum between a and b */
 #define CDEFMT_MIN(a, b)    \
@@ -235,37 +258,38 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   __CDEFMT_LOG(__COUNTER__, level_, __FILE__, __LINE__, message_, \
                BOOST_PP_SEQ_POP_FRONT(BOOST_PP_VARIADIC_TO_SEQ(, ##__VA_ARGS__)))
 
-#define __CDEFMT_LOG(counter_, level_, file_, line_, message_, args_seq_)                        \
-  do {                                                                                           \
-    /* Generate metadata string */                                                               \
-    CDEFMT_GENERATE_METADATA(counter_, level_, file_, line_, message_, args_seq_);               \
-                                                                                                 \
-    /* Generate log type information */                                                          \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                 \
-      const void* log_id;                                                                        \
-      CDEFMT_GENERATE_LOG_ARGS(counter_, args_seq_)                                              \
-      uint8_t dynamic_data[CDEFMT_DYNAMIC_SIZE_MAX_T];                                           \
-    };                                                                                           \
-                                                                                                 \
-    size_t cdefmt_dynamic_size = 0;                                                              \
-    CDEFMT_CALCULATE_DYNAMIC_SIZE(counter_, args_seq_)                                           \
-                                                                                                 \
-    /* Create/get log buffer */                                                                  \
-    struct CDEFMT_LOG_ARGS_T(counter_) * CDEFMT_LOG_ARGS(counter_) = CDEFMT_GET_LOG_BUFFER(      \
-        counter_, sizeof(struct CDEFMT_LOG_ARGS_T(counter_)) + cdefmt_dynamic_size);             \
-                                                                                                 \
-    /* Assign log id */                                                                          \
-    CDEFMT_LOG_ARGS(counter_)->log_id = &(CDEFMT_LOG_METADATA(counter_));                        \
-    size_t cdefmt_dynamic_offset = 0;                                                            \
-                                                                                                 \
-    /* Assign arguments */                                                                       \
-    CDEFMT_ASSIGN_LOG_ARGS(counter_, args_seq_)                                                  \
-                                                                                                 \
-    /* Send log to sink */                                                                       \
-    cdefmt_log(CDEFMT_LOG_ARGS(counter_), CDEFMT_GET_DYNAMIC_LOG_BUFFER_SIZE(counter_), level_); \
-                                                                                                 \
-    /* Release log buffer */                                                                     \
-    CDEFMT_RELEASE_LOG_BUFFER(counter_);                                                         \
+#define __CDEFMT_LOG(counter_, level_, file_, line_, message_, args_seq_)                 \
+  do {                                                                                    \
+    /* Generate metadata string */                                                        \
+    CDEFMT_GENERATE_METADATA(counter_, level_, file_, line_, message_, args_seq_);        \
+                                                                                          \
+    /* Generate log type information */                                                   \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                          \
+      const void* log_id;                                                                 \
+      CDEFMT_GENERATE_LOG_ARGS(counter_, args_seq_)                                       \
+      uint8_t dynamic_data[CDEFMT_DYNAMIC_SIZE_MAX_T];                                    \
+    };                                                                                    \
+                                                                                          \
+    size_t cdefmt_dynamic_size = 0;                                                       \
+    CDEFMT_CALCULATE_DYNAMIC_SIZE(counter_, args_seq_)                                    \
+                                                                                          \
+    /* Create/get log buffer */                                                           \
+    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = CDEFMT_GET_LOG_BUFFER( \
+        counter_, sizeof(struct CDEFMT_LOG_ARGS_T(counter_)) + cdefmt_dynamic_size);      \
+                                                                                          \
+    /* Assign log id */                                                                   \
+    CDEFMT_LOG_ARGS(counter_).log_id = &(CDEFMT_LOG_METADATA(counter_));                  \
+    size_t cdefmt_dynamic_offset = 0;                                                     \
+                                                                                          \
+    /* Assign arguments */                                                                \
+    CDEFMT_ASSIGN_LOG_ARGS(counter_, args_seq_)                                           \
+                                                                                          \
+    /* Send log to sink */                                                                \
+    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), CDEFMT_GET_DYNAMIC_LOG_BUFFER_SIZE(counter_),  \
+               __CDEFMT_CAST(enum cdefmt_level, level_));                                 \
+                                                                                          \
+    /* Release log buffer */                                                              \
+    CDEFMT_RELEASE_LOG_BUFFER(counter_);                                                  \
   } while (0)
 
 /* ========================================== Metadata ========================================== */
@@ -346,10 +370,10 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
   BOOST_PP_SEQ_FOR_EACH_I(__CDEFMT_GENERATE_LOG_ARG, counter_, args_seq_)
 
 /* Copies the argument's value into the log struct */
-#define CDEFMT_ASSIGN_MEMCPY(counter_, i_, from_)           \
-  do {                                                      \
-    memcpy(&(CDEFMT_LOG_ARGS(counter_)->arg##i_), &(from_), \
-           sizeof(CDEFMT_LOG_ARGS(counter_)->arg##i_));     \
+#define CDEFMT_ASSIGN_MEMCPY(counter_, i_, from_)          \
+  do {                                                     \
+    memcpy(&(CDEFMT_LOG_ARGS(counter_).arg##i_), &(from_), \
+           sizeof(CDEFMT_LOG_ARGS(counter_).arg##i_));     \
   } while (0)
 
 /* Assign argument to the log buffer */
@@ -379,57 +403,58 @@ struct cdefmt_build_id {
 #define NT_GNU_BUILD_ID 3
 #endif
 
-#define __CDEFMT_INIT(counter_)                                                                    \
-  do {                                                                                             \
-    static const struct __attribute__((packed)) {                                                  \
-      uint32_t version;                                                                            \
-      uint32_t counter;                                                                            \
-      uint32_t line;                                                                               \
-      uint32_t file_len;                                                                           \
-      uint32_t fmt_len;                                                                            \
-      uint32_t names_len;                                                                          \
-      uint8_t level;                                                                               \
-      char file[sizeof(__FILE__)];                                                                 \
-      char fmt[sizeof("cdefmt init, build-id: {}")];                                               \
-      struct __attribute__((packed)) {                                                             \
-        struct __attribute__((packed)) {                                                           \
-          uint32_t len;                                                                            \
-          char name[sizeof("build_id")];                                                           \
-        } n0;                                                                                      \
-      } names;                                                                                     \
-    } CDEFMT_LOG_METADATA(counter_) __attribute__((section(".cdefmt.init"))) = {                   \
-        .version = CDEFMT_SCHEMA_VERSION,                                                          \
-        .counter = (counter_),                                                                     \
-        .line = (__LINE__),                                                                        \
-        .file_len = (sizeof(__FILE__)),                                                            \
-        .fmt_len = (sizeof("cdefmt init, build-id: {}")),                                          \
-        .names_len = 1,                                                                            \
-        .level = (CDEFMT_LEVEL_ERR),                                                               \
-        .file = (__FILE__),                                                                        \
-        .fmt = ("cdefmt init, build-id: {}"),                                                      \
-        .names =                                                                                   \
-            {                                                                                      \
-                .n0 =                                                                              \
-                    {                                                                              \
-                        .len = sizeof("build_id"),                                                 \
-                        .name = ("build_id"),                                                      \
-                    },                                                                             \
-            },                                                                                     \
-    };                                                                                             \
-                                                                                                   \
-    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                                   \
-      const void* log_id;                                                                          \
-      unsigned char build_id[CDEFMT_GNU_BUILD_ID_SIZE];                                            \
-    };                                                                                             \
-                                                                                                   \
-    struct CDEFMT_LOG_ARGS_T(counter_) CDEFMT_LOG_ARGS(counter_) = {                               \
-        .log_id = &(CDEFMT_LOG_METADATA(counter_)),                                                \
-    };                                                                                             \
-    memcpy(&(CDEFMT_LOG_ARGS(counter_).build_id),                                                  \
-           &(__cdefmt_build_id.data[__cdefmt_build_id.name_size]),                                 \
-           sizeof(CDEFMT_LOG_ARGS(counter_).build_id));                                            \
-                                                                                                   \
-    cdefmt_log(&CDEFMT_LOG_ARGS(counter_), sizeof(CDEFMT_LOG_ARGS(counter_)), __CDEFMT_LEVEL_ERR); \
+#define __CDEFMT_INIT(counter_)                                                   \
+  do {                                                                            \
+    static const struct __attribute__((packed)) {                                 \
+      uint32_t version;                                                           \
+      uint32_t counter;                                                           \
+      uint32_t line;                                                              \
+      uint32_t file_len;                                                          \
+      uint32_t fmt_len;                                                           \
+      uint32_t names_len;                                                         \
+      uint8_t level;                                                              \
+      char file[sizeof(__FILE__)];                                                \
+      char fmt[sizeof("cdefmt init, build-id: {}")];                              \
+      struct __attribute__((packed)) {                                            \
+        struct __attribute__((packed)) {                                          \
+          uint32_t len;                                                           \
+          char name[sizeof("build_id")];                                          \
+        } n0;                                                                     \
+      } names;                                                                    \
+    } CDEFMT_LOG_METADATA(counter_) __attribute__((section(".cdefmt.init"))) = {  \
+        .version = CDEFMT_SCHEMA_VERSION,                                         \
+        .counter = (counter_),                                                    \
+        .line = (__LINE__),                                                       \
+        .file_len = (sizeof(__FILE__)),                                           \
+        .fmt_len = (sizeof("cdefmt init, build-id: {}")),                         \
+        .names_len = 1,                                                           \
+        .level = (CDEFMT_LEVEL_ERR),                                              \
+        .file = (__FILE__),                                                       \
+        .fmt = ("cdefmt init, build-id: {}"),                                     \
+        .names =                                                                  \
+            {                                                                     \
+                .n0 =                                                             \
+                    {                                                             \
+                        .len = sizeof("build_id"),                                \
+                        .name = ("build_id"),                                     \
+                    },                                                            \
+            },                                                                    \
+    };                                                                            \
+                                                                                  \
+    struct __attribute__((packed)) CDEFMT_LOG_ARGS_T(counter_) {                  \
+      const void* log_id;                                                         \
+      unsigned char build_id[CDEFMT_GNU_BUILD_ID_SIZE];                           \
+    };                                                                            \
+                                                                                  \
+    struct CDEFMT_LOG_ARGS_T(counter_) __CDEFMT_LOG_ARGS(counter_) = {            \
+        .log_id = &(CDEFMT_LOG_METADATA(counter_)),                               \
+    };                                                                            \
+    memcpy(&(__CDEFMT_LOG_ARGS(counter_).build_id),                               \
+           &(__cdefmt_build_id.data[__cdefmt_build_id.name_size]),                \
+           sizeof(__CDEFMT_LOG_ARGS(counter_).build_id));                         \
+                                                                                  \
+    cdefmt_log(&__CDEFMT_LOG_ARGS(counter_), sizeof(__CDEFMT_LOG_ARGS(counter_)), \
+               (enum cdefmt_level)__CDEFMT_LEVEL_ERR);                            \
   } while (0)
 
 #define __CDEFMT_GENERATE_INIT()                                   \
@@ -447,5 +472,9 @@ struct cdefmt_build_id {
                                                                    \
     return 0;                                                      \
   }
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* CDEFMT_H */

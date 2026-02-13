@@ -214,13 +214,13 @@ int main(int argc, char* cargv[]) {
 
   // Dynamic strings
 
-  char* dynamic_string = "This is a dynamic string, the size is not known at compile time.";
+  const char* dynamic_string = "This is a dynamic string, the size is not known at compile time.";
 
   CDEFMT_INFO("Dynamic string: {:s}", CDEFMT_DYNAMIC_STRING(dynamic_string));
   CDEFMT_INFO("Dynamic string (truncated): {:s}", CDEFMT_DYNAMIC_STRING_N(dynamic_string, 20));
 
   // Dynamic arrays
-  some_struct_t* dynamic_struct = calloc(3, sizeof(some_struct_t));
+  some_struct_t* dynamic_struct = static_cast<some_struct_t *>(calloc(3, sizeof(some_struct_t)));
   size_t struct_len = 2;
 
   dynamic_struct[0].a = 1;
@@ -244,7 +244,7 @@ int main(int argc, char* cargv[]) {
               CDEFMT_DYNAMIC_STRING(dynamic_string));
 
   /* Thanks ChatGPT 😅 */
-  char* really_long_string =
+  const char* really_long_string =
       "The Last Signal\n"
       "The spaceship Aurora drifted through the silent void, its systems failing one by one. \n"
       "Captain Elias sat in the dim cockpit, staring at the blinking distress beacon. It had been "
@@ -291,7 +291,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level) {
   fstat(1, &stat);
 
   if (S_ISFIFO(stat.st_mode)) {
-    static_assert(sizeof(uint64_t) >= sizeof(size_t));
+    static_assert(sizeof(uint64_t) >= sizeof(size_t), "uint64_t must be at least as large as size_t");
     const uint64_t size_u64 = size;
 
     // Write raw binary data as length value pairs.

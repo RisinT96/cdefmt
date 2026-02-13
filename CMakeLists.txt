@@ -46,6 +46,7 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 
     if(CDEFMT_BUILD_EXAMPLE_STDOUT)
         add_subdirectory("examples/stdout")
+        add_subdirectory("examples/stdout-cpp")
     endif()
 
     if(CDEFMT_BUILD_EXAMPLE_STDIN)
