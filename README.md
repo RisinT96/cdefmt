@@ -153,23 +153,66 @@ This macro is expanded by the preprocessor into
 
 ```c
 1   do {
-2       const static __attribute__((section(".cdefmt"))) char cdefmt_log_string2[] = "{""\"version\":""1"",""\"counter\":""2"",""\"level\":""2"",""\"file\":\"""/root/git/cdefmt/examples/stdout/main.c""\",""\"line\":""52"",""\"message\":\"""Example log {} {:x}""\",""\"names\": [""\"""argument_a""\""",""\"""arg_b""\"""]""}";
-3       struct __attribute__((packed)) cdefmt_log_args_t2 {
-4           const char* log_id;
-5           __typeof__(argument_a) arg0;
-6           __typeof__(arg_b) arg1;
-7       };
-8       struct cdefmt_log_args_t2 cdefmt_log_args2 = {
-9           .log_id = cdefmt_log_string2,
-10      };
-11      do {
-12          memcpy((&cdefmt_log_args2.arg0), &(argument_a), sizeof(cdefmt_log_args2.arg0));
-13      } while (0);
-14      do {
-15          memcpy((&cdefmt_log_args2.arg1), &(arg_b), sizeof(cdefmt_log_args2.arg1));
-16      } while (0);
-17      cdefmt_log(&cdefmt_log_args2, sizeof(cdefmt_log_args2), 2);
-18  } while (0);
+2       static const struct __attribute__((packed)) {
+3           uint32_t version;
+4           uint32_t counter;
+5           uint32_t line;
+6           uint32_t file_len;
+7           uint32_t fmt_len;
+8           uint32_t names_len;
+9           uint8_t level;
+10          char file[sizeof("/root/git/cdefmt/examples/stdout/main.c")];
+11          char fmt[sizeof("Example log {} {:x}")];
+12          struct __attribute__((packed)) {
+13              struct __attribute__((packed)) {
+14                  uint32_t len;
+15                  char name[sizeof("argument_a")];
+16              } n0;
+17              struct __attribute__((packed)) {
+18                  uint32_t len;
+19                  char name[sizeof("arg_b")];
+20              } n1;
+21          } names;
+22      } cdefmt_log_metadata50 __attribute__((section(".cdefmt.metadata"))) = {
+23          .version = 1,
+24          .counter = (50),
+25          .line = (174),
+26          .file_len = (sizeof("/root/git/cdefmt/examples/stdout/main.c")),
+27          .fmt_len = (sizeof("Example log {} {:x}")),
+28          .names_len = (2),
+29          .level = (2),
+30          .file = ("/root/git/cdefmt/examples/stdout/main.c"),
+31          .fmt = ("Example log {} {:x}"),
+32          .names = {
+33              .n0 = {
+34                  .len = sizeof("argument_a"),
+35                  .name = ("argument_a"),
+36              },
+37              .n1 = {
+38                  .len = sizeof("arg_b"),
+39                  .name = ("arg_b"),
+40              },
+41          },
+42      };
+43      struct __attribute__((packed)) cdefmt_log_args_t50 {
+44          const void* log_id;
+45          __typeof__(argument_a) arg0;
+46          __typeof__(arg_b) arg1;
+47          uint8_t dynamic_data[128];
+48      };
+49      size_t cdefmt_dynamic_size = 0;
+50      struct cdefmt_log_args_t50* cdefmt_log_args50 = (&(struct cdefmt_log_args_t50){0});
+51      cdefmt_log_args50->log_id = &(cdefmt_log_metadata50);
+52      size_t cdefmt_dynamic_offset = 0;
+53      do {
+54          memcpy(&(cdefmt_log_args50->arg0), &(argument_a), sizeof(cdefmt_log_args50->arg0));
+55      } while (0);
+56      do {
+57          memcpy(&(cdefmt_log_args50->arg1), &(arg_b), sizeof(cdefmt_log_args50->arg1));
+58      } while (0);
+59      cdefmt_log(cdefmt_log_args50, (sizeof(*cdefmt_log_args50) - (128 - cdefmt_dynamic_offset)), 2);
+60      ;
+61    } while (0);
 ```
 Let's go over each line and explain what's happening there:
 
@@ -177,64 +220,77 @@ Let's go over each line and explain what's happening there:
     *   Creates scope for local variables
     *   Requires user to add a semicolon after the macro call
     *   Protects against `if (...) macro_call(); else ...` issues
-2.  We have a few things going on here, let's break them down:
-    *   `const static char cdefmt_log_string2[]`:<br>
-        We're creating a const static string that will hold the actual log string along with some metadata.<br>
-        Making it `static` allows the compiler to allocate a permanent address for this string, this will come into play later 😉.<br>
-        > Notice how the string's name ends with `2`, the same value as in the `counter` field in the json.
-    *   `__attribute__((section(".cdefmt")))`:<br>
-        Tell the linker to place the string into the special `.cdefmt` section in the elf.<br>
-        This allows us to separate all the log strings into a separate section, which can later be stripped from the elf, removing any trace of the strings from the binary.
-    *   Now comes the string itself, it's generated using some macro magic and depends on a known c feature - any consecutive string literals are merged into a single string literal by the compiler.<br>
-        The resulting string is actually a simple json, let me format it for readability:
-        ```json
-        {
-            "version": 1,
-            "counter": 2,
-            "level": 2,
-            "file": "/root/git/cdefmt/examples/stdout/main.c",
-            "line": 52,
-            "message": "Example log {} {:x}",
-            "names": ["argument_a", "arg_b"]
-        }
-        ```
-        | field | explanation |
-        | ----- | ----------- |
-        | version | json schema version |
-        | counter | unique counter identifying this log, the uniqueness is per compilation unit (`.c` file), so logs from  |different files can repeat the value.
-        | level | the log level (verbose, debug, etc...) |
-        | file | the file where this log came from |
-        | line | the code line the log came from |
-        | message | the user provided format string |
-        | names | the argument names, in the same order as the user provided them |
-3.  We're creating a new type which will uniquely identify this log and it's arguments.<br>
-    The struct is `packed` to remove any padding, and make it as small as possible.<br>
-    > Notice how the struct's name ends with `2`, the same value as in the `counter` field in the json.
-4.  The first value in the struct is the log id.
-5.  The second value in the struct is a copy of the first argument.
-6.  The third value in the struct is a copy of the second argument.
-7.  Closing the type definition.
-8.  Instantiate a variable of the newly defined type.<br>
-    > Notice how `2` appears here again in all the type/variable names.
-9.  Assign the address of the log string into the `log_id` field.<br>
-    We'll be using this address as the log's unique identifier, the parser will be able to extract the log string from the original elf using this value.
-10. Closing the initializer.
-11. See 1.
-12. Copy the value of the first argument into the log structure.
-13. See 1.
-14. See 1.
-15. Copy the value of the second argument into the log structure.
-16. See 1.
-17. Send the log into the user implemented logging backend
-    | argument | explanation |
-    | -------- | ----------- |
-    | &cdefmt_log_args2 | pointer to the log structure |
-    | sizeof(cdefmt_log_args2) | size of the log structure |
-    | 2 | log level (can be used for runtime filtering by the user) |
-    From the user's point of view, he's receiving a binary blob, it's the user's responsibility to store this blob, and then use the parsing library to parse this blob back into the log string.
-18. See 1.
+2.  Define a stract type:
+    * This struct will hold the metadata for this log.
+    * The struct is packed to minimize the metadata size.
+    * The struct is static, allowing the compiler to assign it a permanent address, rather than placing it on the stack.
+    * The struct is const to ensure immutability.
+3.  Define the metadata version (for future compatibility).
+4.  Define a unique counter, the value is unique per log in each compilation unit.
+    There might be multiple logs with the same value in different compilation units.
+    This value will be used to identify the log when decoding the logs.
+5.  Define the line number where the log is defined.
+6.  Define the length of the filename string - used when parsing the metadata structure.
+7.  Define the length of the format string - used when parsing the metadata structure.
+8.  Define the amount of named arguments profided - used when parsing the metadata structure.
+9.  Define the level of the log.
+10. Define the filename where the log is defined - this is used later to find the compilation unit.
+11. Define the format string.
+12. Define a sub-struct - containing the names of the arguments.
+13. Define a sub struct - containing the name of the first argument.
+14. Define the length of the first argument's name.
+15. Define the first argument's name.
+16. Close the struct.
+17. Define a sub struct - containing the name of the second argument.
+18. Define the length of the second argument's name.
+19. Define the second argument's name.
+20. Close the struct.
+21. Close the names struct.
+22. Name the metadata variable, and place it into the `.cdefmt.metadata` section.
+    *   Notice how the variable's name ends with `50`, the same value that will be assigned to the `counter` field.
+23. Assign the version, currently it's 1.
+24. Assign the counter value.
+25. Assign the log line.
+26. Assign the filename length.
+27. Assign the format string length.
+28. Assign the amount of arguments.
+29. Assign the log's level (2 = INFO).
+30. Assign the filename.
+31. Assign the format string.
+32. Assign the names of the arguments.
+33. Assign the name of the first argument.
+34. Assign the length of the name.
+35. Assign the name itself.
+36. Closing scope.
+37. Assign the name of the second argumnet.
+38. Assign the length of the name.
+39. Assign the name itself.
+40. Closing scope.
+41. Closing scope.
+42. Closing scope.
+43. Define a struct for holding the log information that will be sent over the wire.
+    *   The struct is packed to save space.
+44. Log ID - pointer to the log metadata structure.
+45. First argument.
+46. Second argument.
+47. Array for holding dynamically sized arguments.
+48. Closing scope.
+49. Assign dynamic size to 0, as we don't have any dynamic arguments.
+50. Create an instance of the log args structure.
+51. Assign the log_id, to the address of the metadata structure.
+52. Assign the dynamic offset to 0, we can increment it later if there's any dynamic arguments.
+53. See 1.
+54. Copy the first argument into the log args structure.
+55. See 1.
+56. See 1.
+57. Copy the second argument into the log args structure.
+58. See 1.
+59. Send the log args structure to the log function.
+    *   Notice that the length should calculate the size of the log args structure, which in this case is `sizeof(log_args_t)` minus the entire dynamic data as there's no dynamic data.
+60. Placeholder in case user opts in for a static/heap log buffer rather than a stack based one.
+61. See 1
 
->  ⚠️ Notice how we don't access the log string at any time during runtime, only it's address.
+>  ⚠️ Notice how we don't access the log metadata structure at any time during runtime, only its address.
 
 ## 5.2. Metadata
 
@@ -265,8 +321,8 @@ As we've seen in the previous section, the log metadata is stored in a special `
 
 To gain a better understanding I recommend reading through the [binutils ld docs](https://sourceware.org/binutils/docs/ld/Scripts.html).
 
-When the project is compiled and linked, each log string is assigned a unique address by the linker, this address can be used as a unique ID to identify the log.<br>
-The compilation process embeds these addresses into the places that reference the log strings, because, being marked `INFO` and `static`, they don't depend on any runtime linkage, and are hardcoded by the linker, this means **we can completely remove the `.cdefmt` section from the shipped binary**, without affecting any of the functionality.
+When the project is compiled and linked, each log metadata struct is assigned a unique address by the linker, this address can be used as a unique ID to identify the log.<br>
+The compilation process embeds these addresses into the places that reference the log metadata, because, being marked `INFO` and `static`, they don't depend on any runtime linkage, and are hardcoded by the linker, this means **we can completely remove the `.cdefmt` section from the shipped binary**, without affecting any of the functionality.
 
 
 Now we know where the metadata strings are stored, and how we can extract them using the log ID, however we still don't know how to parse the log's arguments, as they're in a packed struct and can have any size, type or structure.<br>
@@ -299,7 +355,7 @@ All that's left is to parse the binary blobs generated by the logger:
 1.  Load the **original, unstripped** binary - there we find the `.cdefmt` section and the debugging information.
 2.  Extract the log id from the binary blob.<br>
     Since we have the elf, we know the size of a pointer in the target, so we know the size of the log id.
-3.  Find the log metadata in the `.cdefmt` section, and parse the json.
+3.  Find the log metadata in the `.cdefmt` section, and parse the binary structure.
 4.  Use the counter and source file to find the debugging information describing the log's arguments.
 5.  Parse the remaining fields of the log args structure.
 6.  Format the log string with the parsed arguments.
