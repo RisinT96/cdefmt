@@ -125,7 +125,7 @@ void cdefmt_log(const void* log, size_t size, enum cdefmt_level level);
 #define CDEFMT_GET_LOG_BUFFER(counter_, size_) \
   ((struct CDEFMT_LOG_ARGS_T(counter_)*)CDEFMT_DYNAMIC_LOG_BUFFER_ALLOC(size_))
 #define CDEFMT_RELEASE_LOG_BUFFER(counter_) \
-  CDEFMT_DYNAMIC_LOG_BUFFER_FREE(CDEFMT_LOG_ARGS(counter_))
+  CDEFMT_DYNAMIC_LOG_BUFFER_FREE(__CDEFMT_LOG_ARGS(counter_))
 
 // Log args are dynamically allocated, addressed as a pointer.
 #define CDEFMT_LOG_ARGS(counter_) (*__CDEFMT_LOG_ARGS(counter_))
