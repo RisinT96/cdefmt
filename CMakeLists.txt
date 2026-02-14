@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.22)
 include(FetchContent)
 
 project("cdefmt")
@@ -8,11 +8,13 @@ FetchContent_Declare(
     preprocessor
     GIT_REPOSITORY https://github.com/boostorg/preprocessor.git
     GIT_TAG boost-1.86.0
+    GIT_SHALLOW TRUE
 )
 FetchContent_Declare(
     vmd
     GIT_REPOSITORY https://github.com/boostorg/vmd.git
     GIT_TAG boost-1.86.0
+    GIT_SHALLOW TRUE
 )
 
 FetchContent_MakeAvailable(preprocessor)
@@ -53,7 +55,8 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         FetchContent_Declare(
             Corrosion
             GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-            GIT_TAG v0.5
+            GIT_TAG v0.6.1
+            GIT_SHALLOW TRUE
         )
         FetchContent_MakeAvailable(Corrosion)
 
