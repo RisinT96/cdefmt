@@ -9,12 +9,12 @@ keywords = ["cdefmt", "defmt"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/risint96/cdefmt"
-version = "0.7.0"
+version = "0.8.0"
 
 [workspace.dependencies]
 anyhow = "1.0"
-cdefmt-decoder = { path = "decoder", version = "0.7.0" }
-cdefmt-parser = { path = "parser", version = "0.7.0" }
+cdefmt-decoder = { path = "decoder", version = "0.8.0" }
+cdefmt-parser = { path = "parser", version = "0.8.0" }
 clap = { version = "4.5", features = ["derive"] }
 gimli = "0.33"
 lazy-regex = "3.6"
