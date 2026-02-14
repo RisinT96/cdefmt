@@ -13,7 +13,6 @@ version.workspace = true
 anyhow.workspace = true
 gimli.workspace = true
 object.workspace = true
-lazy-regex.workspace = true
 cdefmt-parser.workspace = true
 thiserror.workspace = true
 rformat.workspace = true
