@@ -12,6 +12,7 @@ repository = "https://github.com/risint96/cdefmt"
 version = "0.7.0"
 
 [workspace.dependencies]
+anyhow = "1.0"
 cdefmt-decoder = { path = "decoder", version = "0.7.0" }
 cdefmt-parser = { path = "parser", version = "0.7.0" }
 clap = { version = "4.5", features = ["derive"] }

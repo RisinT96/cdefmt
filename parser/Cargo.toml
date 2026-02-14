@@ -10,6 +10,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 gimli.workspace = true
 object.workspace = true
 thiserror.workspace = true

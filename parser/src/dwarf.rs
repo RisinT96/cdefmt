@@ -3,18 +3,11 @@ use gimli::{EndianSlice, EntriesCursor, Reader, Unit};
 use object::{File, Object, ObjectSection, ReadRef};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt::{self};
 
 use crate::r#type::{StructureMember, Type};
 use crate::Error;
 use crate::Result;
-
-macro_rules! get_attribute {
-    ($entry:ident, $attribute:path) => {
-        $entry
-            .attr_value($attribute)?
-            .ok_or(Error::NoAttribute($attribute))?
-    };
-}
 
 macro_rules! some {
     ($expr:expr) => {
@@ -25,7 +18,122 @@ macro_rules! some {
     };
 }
 
-/// Contains an uncompressed dwarf and it's endianness.
+macro_rules! parse_ctx {
+    ($expr:expr, $desc:expr, $dwarf:expr, $unit:expr, $entry:expr $(,)?) => {
+        $expr.with_parse_context($desc, $dwarf, $unit, $entry)
+    };
+}
+
+fn get_attribute<R: Reader>(
+    entry: &DebuggingInformationEntry<'_, '_, R>,
+    attribute: gimli::DwAt,
+) -> Result<AttributeValue<R, R::Offset>> {
+    entry
+        .attr_value(attribute)?
+        .ok_or(Error::NoAttribute(attribute).into())
+}
+
+pub(crate) struct SourceLocation {
+    pub file: String,
+    pub line: u64,
+    pub column: u64,
+}
+
+impl SourceLocation {
+    pub fn extract<R: Reader>(
+        dwarf: &gimli::Dwarf<R>,
+        unit: &Unit<R>,
+        entry: &DebuggingInformationEntry<'_, '_, R>,
+    ) -> Option<Self> {
+        // Get the file attribute value (should be a file index)
+        let file_attr = get_attribute(entry, gimli::DW_AT_decl_file).ok()?;
+        let file_index = match file_attr {
+            AttributeValue::FileIndex(0) => return None,
+            AttributeValue::FileIndex(index) => index,
+            _ => return None,
+        };
+
+        // Get the line program for the unit
+        let line_program = unit.line_program.as_ref()?;
+
+        // DWARF file indices are 1-based
+        let file_entry = line_program.header().file(file_index)?;
+
+        // Get the file name as a Cow<[u8]>
+        let file_name = dwarf.attr_string(unit, file_entry.path_name()).ok()?;
+        let file_name = file_name.to_string().ok()?;
+
+        let line = entry
+            .attr_value(gimli::DW_AT_decl_line)
+            .ok()??
+            .udata_value()?;
+
+        let column = entry
+            .attr_value(gimli::DW_AT_decl_column)
+            .ok()??
+            .udata_value()?;
+
+        Some(Self {
+            file: file_name.to_string(),
+            line,
+            column,
+        })
+    }
+}
+
+impl fmt::Display for SourceLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.file, self.line, self.column)
+    }
+}
+
+use anyhow::{Context, Result as AnyhowResult};
+
+pub trait ContextLocationExt<T> {
+    fn with_parse_context<R>(
+        self,
+        item: &str,
+        dwarf: &gimli::Dwarf<R>,
+        unit: &gimli::Unit<R>,
+        entry: &gimli::DebuggingInformationEntry<'_, '_, R>,
+    ) -> AnyhowResult<T>
+    where
+        R: gimli::Reader;
+}
+
+impl<T> ContextLocationExt<T> for AnyhowResult<T> {
+    fn with_parse_context<R>(
+        self,
+        item: &str,
+        dwarf: &gimli::Dwarf<R>,
+        unit: &gimli::Unit<R>,
+        entry: &gimli::DebuggingInformationEntry<'_, '_, R>,
+    ) -> AnyhowResult<T>
+    where
+        R: gimli::Reader,
+    {
+        self.with_context(|| {
+            // Bind to a variable so we can borrow it later.
+            let name = get_attribute(entry, gimli::DW_AT_name)
+                .ok()
+                .and_then(|n| dwarf.attr_string(unit, n).ok());
+            // Borrow the bound name and dig down to the Cow<str>.
+            let name = name
+                .as_ref()
+                .and_then(|n| n.to_string().ok())
+                .unwrap_or(std::borrow::Cow::Borrowed("<unnamed>"));
+
+            let location = SourceLocation::extract(dwarf, unit, entry);
+            if let Some(location) = location {
+                format!("{location}: in {item} `{name}`")
+            } else {
+                format!("<unknown>: in {item} `{name}`")
+            }
+        })
+    }
+}
+
+/// Contains an uncompressed dwarf and its endianness.
 #[derive(Debug)]
 pub(crate) struct Dwarf<'elf> {
     dwarf_sections: gimli::DwarfSections<Cow<'elf, [u8]>>,
@@ -83,7 +191,16 @@ impl<'elf> Dwarf<'elf> {
         let compilation_unit = some!(find_compilation_unit(&dwarf, compilation_unit_name)?);
         let unit_offset = some!(find_type_die(&dwarf, &compilation_unit, type_name)?);
 
-        parse_type(&dwarf, &compilation_unit, unit_offset).map(Some)
+        // Unwrap safety: the DIE at unit_offset must exist, otherwise find_type_die would have returned an error.
+        let entry = compilation_unit.entry(unit_offset).unwrap();
+
+        parse_ctx!(
+            parse_type(&dwarf, &compilation_unit, unit_offset).map(Some),
+            "type",
+            &dwarf,
+            &compilation_unit,
+            &entry
+        )
     }
 
     /// Converts self into an EndianSlice Dwarf.
@@ -119,7 +236,7 @@ fn find_compilation_unit<R: Reader>(
                 continue;
             }
 
-            let name_attribute = get_attribute!(entry, gimli::DW_AT_name);
+            let name_attribute = get_attribute(entry, gimli::DW_AT_name)?;
             let unit_name = dwarf.attr_string(&unit, name_attribute)?;
             let unit_name = unit_name.to_string()?;
 
@@ -200,27 +317,80 @@ fn parse_type<R: Reader>(
 
     if let Some((_, entry)) = entries.next_dfs()? {
         let tag = entry.tag();
+        let entry = entry.clone();
 
         // Parse known types
         match tag {
-            gimli::DW_TAG_base_type => parse_base(entry),
-            gimli::DW_TAG_enumeration_type => parse_enumeration(dwarf, unit, entries),
-            gimli::DW_TAG_pointer_type => parse_pointer(entry),
-            gimli::DW_TAG_structure_type => parse_structure(dwarf, unit, entries),
-            gimli::DW_TAG_array_type => parse_array(dwarf, unit, entries),
+            gimli::DW_TAG_base_type => {
+                parse_ctx!(parse_base(&entry), "base type", dwarf, unit, &entry)
+            }
+            gimli::DW_TAG_enumeration_type => parse_ctx!(
+                parse_enumeration(dwarf, unit, entries),
+                "enumeration",
+                dwarf,
+                unit,
+                &entry
+            ),
+            gimli::DW_TAG_pointer_type => {
+                parse_ctx!(parse_pointer(&entry), "pointer type", dwarf, unit, &entry)
+            }
+            gimli::DW_TAG_structure_type => parse_ctx!(
+                parse_structure(dwarf, unit, entries),
+                "structure",
+                dwarf,
+                unit,
+                &entry
+            ),
+            gimli::DW_TAG_array_type => parse_ctx!(
+                parse_array(dwarf, unit, entries),
+                "array",
+                dwarf,
+                unit,
+                &entry
+            ),
             gimli::DW_TAG_const_type | gimli::DW_TAG_typedef => {
-                let type_ref = get_attribute!(entry, gimli::DW_AT_type);
+                let ty_name = if tag == gimli::DW_TAG_const_type {
+                    "const type"
+                } else {
+                    "typedef"
+                };
+
+                let type_ref = parse_ctx!(
+                    get_attribute(&entry, gimli::DW_AT_type),
+                    ty_name,
+                    dwarf,
+                    unit,
+                    &entry
+                )?;
 
                 if let AttributeValue::UnitRef(unit_ref) = type_ref {
-                    parse_type(dwarf, unit, unit_ref)
+                    parse_ctx!(
+                        parse_type(dwarf, unit, unit_ref),
+                        ty_name,
+                        dwarf,
+                        unit,
+                        &entry
+                    )
                 } else {
-                    Err(Error::BadAttribute)
+                    parse_ctx!(
+                        Err(Error::BadAttribute.into()),
+                        ty_name,
+                        dwarf,
+                        unit,
+                        &entry
+                    )
                 }
             }
-            _ => Err(Error::UnexpectedTag(tag)),
+            _ => parse_ctx!(
+                Err(Error::UnexpectedTag(tag).into()),
+                "unknown type",
+                dwarf,
+                unit,
+                &entry
+            ),
         }
     } else {
-        Err(Error::NoDIE(start_offset.0.into_u64()))
+        Err(Error::NoDIE(start_offset.0.into_u64()).into())
     }
 }
 
@@ -236,15 +406,15 @@ fn parse_enumeration<R: Reader>(
 ) -> Result<Type> {
     // Figure out the type of the storage used by the enum.
     // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
-    let entry = entries.current().unwrap();
-    let ty = parse_enumeration_storage(dwarf, unit, entry)?;
+    let enum_entry = entries.current().unwrap();
+    let ty = parse_enumeration_storage(dwarf, unit, enum_entry)?;
     let mut valid_values = BTreeMap::default();
 
     // Step into member DIEs
     if let Some((1, mut entry)) = entries.next_dfs()? {
         // Iterate over all the siblings (DW_TAG_enumerator DIEs)
         loop {
-            let name = get_attribute!(entry, gimli::DW_AT_name);
+            let name = get_attribute(entry, gimli::DW_AT_name)?;
             let name = dwarf.attr_string(unit, name)?;
             let name = name.to_string()?;
 
@@ -298,7 +468,7 @@ fn parse_enumeration_storage<R: Reader>(
     } else {
         // If the entry doesn't have a type attribute, try parsing it's encoding and size
         // attributes, like a base type.
-        parse_base(entry)
+        parse_ctx!(parse_base(entry), "base type", dwarf, unit, entry)
     }
 }
 
@@ -315,34 +485,40 @@ fn parse_structure<R: Reader>(
     let mut members = vec![];
 
     // Unwrap should be safe here.
-    let entry = entries.current().unwrap();
+    let struct_entry = entries.current().unwrap();
 
     // TODO: handle DW_AT_bit_size
-    let size = get_attribute!(entry, gimli::DW_AT_byte_size);
+    let size = get_attribute(struct_entry, gimli::DW_AT_byte_size)?;
     let size = size.udata_value().unwrap() as usize;
 
     // Step into member DIEs
-    if let Some((1, mut entry)) = entries.next_dfs()? {
+    if let Some((1, mut member_entry)) = entries.next_dfs()? {
         // Iterate over all the siblings until there's no more.
         loop {
             // Skip non members.
-            if entry.tag() == gimli::DW_TAG_member {
+            if member_entry.tag() == gimli::DW_TAG_member {
                 // Get the name of the member.
-                let name = get_attribute!(entry, gimli::DW_AT_name);
+                let name = get_attribute(member_entry, gimli::DW_AT_name)?;
                 let name = dwarf.attr_string(unit, name)?;
                 let name = name.to_string()?.to_string();
 
                 // Get the type of the member.
                 let ty = if let AttributeValue::UnitRef(unit_offset) =
-                    get_attribute!(entry, gimli::DW_AT_type)
+                    get_attribute(member_entry, gimli::DW_AT_type)?
                 {
-                    parse_type(dwarf, unit, unit_offset)?
+                    parse_ctx!(
+                        parse_type(dwarf, unit, unit_offset),
+                        "structure member",
+                        dwarf,
+                        unit,
+                        &member_entry
+                    )?
                 } else {
-                    return Err(Error::BadAttribute);
+                    return Err(Error::BadAttribute.into());
                 };
 
                 // Get the members offset from the struct's beginning.
-                let offset = entry
+                let offset = member_entry
                     .attr_value(gimli::DW_AT_data_member_location)?
                     .and_then(|o| o.udata_value())
                     .unwrap_or(0);
@@ -351,7 +527,7 @@ fn parse_structure<R: Reader>(
             }
 
             // Get next sibling or break iteration.
-            entry = if let Some(e) = entries.next_sibling()? {
+            member_entry = if let Some(e) = entries.next_sibling()? {
                 e
             } else {
                 break;
@@ -368,7 +544,7 @@ fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>
         if let Some(value) = value.udata_value() {
             return Ok(value);
         } else {
-            return Err(Error::BadAttribute);
+            return Err(Error::BadAttribute.into());
         }
     }
 
@@ -403,15 +579,28 @@ fn parse_array<R: Reader>(
     mut entries: EntriesCursor<'_, '_, R>,
 ) -> Result<Type> {
     // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
-    let entry = entries.current().unwrap();
-    let ty =
-        if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {
-            parse_type(dwarf, unit, unit_offset)
-        } else {
-            // If the entry doesn't have a type attribute, try parsing it's encoding and size
-            // attributes, like a base type.
-            parse_base(entry)
-        }?;
+    let array_entry = entries.current().unwrap();
+    let ty = if let Some(AttributeValue::UnitRef(unit_offset)) =
+        array_entry.attr_value(gimli::DW_AT_type)?
+    {
+        parse_ctx!(
+            parse_type(dwarf, unit, unit_offset),
+            "array type",
+            dwarf,
+            unit,
+            array_entry
+        )
+    } else {
+        // If the entry doesn't have a type attribute, try parsing it's encoding and size
+        // attributes, like a base type.
+        parse_ctx!(
+            parse_base(array_entry),
+            "array base type",
+            dwarf,
+            unit,
+            array_entry
+        )
+    }?;
 
     let mut lengths = vec![];
 
@@ -419,7 +608,13 @@ fn parse_array<R: Reader>(
     if let Some((1, mut entry)) = entries.next_dfs()? {
         // Iterate over all the siblings until there's no more.
         loop {
-            lengths.push(parse_array_dimension(entry)?);
+            lengths.push(parse_ctx!(
+                parse_array_dimension(entry),
+                &format!("array dimension {}", lengths.len()),
+                dwarf,
+                unit,
+                entry
+            )?);
 
             // Get next sibling or break iteration.
             entry = if let Some(e) = entries.next_sibling()? {
@@ -443,8 +638,8 @@ fn parse_array<R: Reader>(
 /// * Returns `Err` if an error is encountered.
 fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
     // TODO: use bit_size if byte_size not available?
-    let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
-    let encoding = get_attribute!(entry, gimli::DW_AT_encoding);
+    let byte_size = get_attribute(entry, gimli::DW_AT_byte_size)?;
+    let encoding = get_attribute(entry, gimli::DW_AT_encoding)?;
 
     if let (AttributeValue::Udata(byte_size), AttributeValue::Encoding(encoding)) =
         (byte_size, encoding)
@@ -461,10 +656,10 @@ fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result
             (8, gimli::DW_ATE_signed) => Ok(Type::I64),
             (4, gimli::DW_ATE_float) => Ok(Type::F32),
             (8, gimli::DW_ATE_float) => Ok(Type::F64),
-            _ => Err(Error::UnsupportedBaseType(encoding, byte_size)),
+            _ => Err(Error::UnsupportedBaseType(encoding, byte_size).into()),
         }
     } else {
-        Err(Error::BadAttribute)
+        Err(Error::BadAttribute.into())
     }
 }
 
@@ -474,7 +669,7 @@ fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result
 /// * Returns `Ok` if the pointer type DIE is successfully parsed.
 /// * Returns `Err` if an error is encountered.
 fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
-    let byte_size = get_attribute!(entry, gimli::DW_AT_byte_size);
+    let byte_size = get_attribute(entry, gimli::DW_AT_byte_size)?;
 
     if let AttributeValue::Udata(byte_size) = byte_size {
         Ok(Type::Pointer(Box::new(match byte_size {
@@ -482,9 +677,9 @@ fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Res
             2 => Type::U16,
             4 => Type::U32,
             8 => Type::U64,
-            _ => return Err(Error::UnsupportedPointerSize(byte_size)),
+            _ => return Err(Error::UnsupportedPointerSize(byte_size).into()),
         })))
     } else {
-        Err(Error::BadAttribute)
+        Err(Error::BadAttribute.into())
     }
 }

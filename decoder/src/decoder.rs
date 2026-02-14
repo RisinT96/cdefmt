@@ -83,7 +83,7 @@ impl<'elf> Decoder<'elf> {
         let members = if let Type::Structure { members, .. } = ty {
             members
         } else {
-            return Err(Error::Custom("The log's args aren't a structure!"));
+            return Err(Error::Custom("The log's args aren't a structure!").into());
         };
 
         // We already read the log_id from the data, skip it.
@@ -118,7 +118,7 @@ impl<'elf> Decoder<'elf> {
         let args = log.get_args();
 
         if args.is_empty() {
-            return Err(Error::Custom("No build ID argument information!"));
+            return Err(Error::Custom("No build ID argument information!").into());
         }
 
         if let Var::Array(build_id) = args.first().unwrap() {
@@ -126,16 +126,16 @@ impl<'elf> Decoder<'elf> {
                 .iter()
                 .map(|b| match b {
                     Var::U8(b) => Ok(*b),
-                    _ => Err(Error::Custom("Build ID data contains non u8 element!")),
+                    _ => Err(Error::Custom("Build ID data contains non u8 element!").into()),
                 })
                 .collect::<Result<Vec<_>>>()?;
             if self.parser.build_id() != build_id {
-                Err(Error::Custom("Build ID mismatch!"))
+                Err(Error::Custom("Build ID mismatch!").into())
             } else {
                 Ok(())
             }
         } else {
-            Err(Error::Custom("Build ID missing or not an array"))
+            Err(Error::Custom("Build ID missing or not an array").into())
         }
     }
 
@@ -151,14 +151,14 @@ impl<'elf> Decoder<'elf> {
         // Extract size from value that was previously decoded
         let size = match value {
             Var::Structure { members } => &members[0].value,
-            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!")),
+            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!").into()),
         }
         .as_u64();
 
         // Extract type from metadata
         let arr_ty = match &metadata.ty {
             Type::Structure { members, .. } => &members[1].ty,
-            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!")),
+            _ => return Err(Error::Custom("Dynamic array metadata is not a struct!").into()),
         };
 
         let ty = match arr_ty {
@@ -166,7 +166,7 @@ impl<'elf> Decoder<'elf> {
             _ => {
                 return Err(Error::Custom(
                     "Dynamic array type metadata is not an array!",
-                ))
+                ).into())
             }
         };
 

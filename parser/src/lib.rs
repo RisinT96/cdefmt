@@ -46,4 +46,4 @@ pub enum Error {
     Custom(&'static str),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, anyhow::Error>;

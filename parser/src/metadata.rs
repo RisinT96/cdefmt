@@ -43,7 +43,7 @@ fn parse_metadata_impl<'elf>(
     offset += 4;
 
     if version != 1 {
-        return Err(Error::SchemaVersion(version));
+        return Err(Error::SchemaVersion(version).into());
     }
 
     let counter = endian_slice.read_u32()?;
@@ -72,7 +72,7 @@ fn parse_metadata_impl<'elf>(
             offset += 4;
             let name = endian_slice.split(name_len)?;
             offset += name_len;
-            str::from_utf8(&name.slice()[..name_len - 1]).map_err(|e| Error::Utf8(id, e))
+            str::from_utf8(&name.slice()[..name_len - 1]).map_err(|e| Error::Utf8(id, e).into())
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -101,14 +101,5 @@ pub(crate) fn parse_metadata(
         .skip(id)
         .map_err(|_| Error::OutOfBounds(id, cdefmt_section.len()))?;
 
-    Ok(parse_metadata_impl(id, &mut endian_slice)
-        .map_err(|e| {
-            // If the error is a gimli error, we want to convert it to an OutOfBounds error.
-            if let Error::Gimli(_) = e {
-                Error::OutOfBounds(id, cdefmt_section.len())
-            } else {
-                e
-            }
-        })?
-        .0)
+    Ok(parse_metadata_impl(id, &mut endian_slice)?.0)
 }

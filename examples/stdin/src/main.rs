@@ -12,18 +12,25 @@ struct Args {
     elf: PathBuf,
 }
 
+fn main() {
+    if let Err(e) = main_impl() {
+        eprintln!("Error: {e:?}");
+        std::process::exit(1);
+    }
+}
+
 /// Takes path to elf as argument, and parses logs whose IDs are read from stdin.
 /// Example usage:
 /// <path to example-stdout> | cargo run examples/stdin <path to example-stdout>
-fn main() -> std::result::Result<(), String> {
+fn main_impl() -> std::result::Result<(), anyhow::Error> {
     let args = Args::parse();
 
-    let file = std::fs::File::open(args.elf).map_err(|e| e.to_string())?;
-    let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| e.to_string())?;
+    let file = std::fs::File::open(args.elf)?;
+    let mmap = unsafe { memmap2::Mmap::map(&file) }?;
 
     let start = std::time::Instant::now();
-    let mut decoder = cdefmt_decoder::Decoder::new(&*mmap).map_err(|e| e.to_string())?;
-    let count = decoder.precache_log_metadata().map_err(|e| e.to_string())?;
+    let mut decoder = cdefmt_decoder::Decoder::new(&*mmap)?;
+    let count = decoder.precache_log_metadata()?;
     let duration = start.elapsed();
 
     println!("pre-cached {count} logs in {}[ms]", duration.as_millis());
@@ -38,14 +45,12 @@ fn main() -> std::result::Result<(), String> {
     let mut buff = vec![0; 0];
 
     while stdin.read_exact(&mut len).is_ok() {
-        let len = gimli::EndianSlice::new(&len, endianness)
-            .read_u64()
-            .map_err(|e| e.to_string())? as usize;
+        let len = gimli::EndianSlice::new(&len, endianness).read_u64()? as usize;
 
         buff.resize(len, 0);
         let current_buff = &mut buff[..len];
 
-        stdin.read_exact(current_buff).map_err(|e| e.to_string())?;
+        stdin.read_exact(current_buff)?;
         let log = decoder.decode_log(current_buff);
 
         match log {
@@ -54,7 +59,7 @@ fn main() -> std::result::Result<(), String> {
                 log.get_level(),
                 log.to_string().unwrap_or_else(|e| e.to_string())
             ),
-            Err(e) => println!("Err: {}", e),
+            Err(e) => println!("Err: {:?}", e),
         }
     }
 
