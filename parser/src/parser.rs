@@ -3,10 +3,10 @@
 use object::{AddressSize, Object, ObjectSection, ObjectSymbol, ReadRef};
 
 use crate::{
-    dwarf::Dwarf,
-    metadata::{parse_metadata, Metadata},
-    r#type::Type,
     Error, Result,
+    dwarf::Dwarf,
+    metadata::{Metadata, parse_metadata},
+    r#type::Type,
 };
 
 /// Responsible for parsing logs from the elf.

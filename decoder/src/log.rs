@@ -7,7 +7,7 @@ use anyhow::Context;
 use cdefmt_parser::metadata::{Level, Metadata};
 use rformat::{fmt::format::format_string, prelude::*};
 
-use crate::{var::Var, Result};
+use crate::{Result, var::Var};
 
 #[derive(Clone, Debug)]
 pub struct Log<'elf> {

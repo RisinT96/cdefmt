@@ -3,14 +3,14 @@
 use std::collections::HashMap;
 
 use cdefmt_parser::{
+    Parser,
     metadata::Metadata,
     r#type::{self, Type},
-    Parser,
 };
 use gimli::Reader;
 use object::ReadRef;
 
-use crate::{log::Log, var::Var, Error, Result};
+use crate::{Error, Result, log::Log, var::Var};
 
 /// Responsible for parsing logs from the elf.
 pub struct Decoder<'elf> {
@@ -163,11 +163,7 @@ impl<'elf> Decoder<'elf> {
 
         let ty = match arr_ty {
             Type::Array { ty, .. } => ty,
-            _ => {
-                return Err(Error::Custom(
-                    "Dynamic array type metadata is not an array!",
-                ).into())
-            }
+            _ => return Err(Error::Custom("Dynamic array type metadata is not an array!").into()),
         };
 
         let dyn_ty = Type::Array {

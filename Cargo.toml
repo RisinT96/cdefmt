@@ -1,10 +1,10 @@
 [workspace]
 members = ["decoder", "parser", "examples/stdin"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Tal Risin <tal@risin.dev>"]
-edition = "2021"
+edition = "2024"
 keywords = ["cdefmt", "defmt"]
 license = "MIT"
 readme = "README.md"

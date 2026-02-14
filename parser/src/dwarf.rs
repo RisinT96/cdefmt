@@ -5,9 +5,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{self};
 
-use crate::r#type::{StructureMember, Type};
 use crate::Error;
 use crate::Result;
+use crate::r#type::{StructureMember, Type};
 
 macro_rules! some {
     ($expr:expr) => {
@@ -436,16 +436,14 @@ fn parse_enumeration<R: Reader>(
                 .sdata_value()
                 // Unwrap safety: DW_AT_const_value of enum whose underlying type is a signed
                 // integer must contain signed data.
-                .unwrap()
-                as i128,
+                .unwrap() as i128,
             Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
                 .attr_value(gimli::DW_AT_const_value)
                 .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
                 .udata_value()
                 // Unwrap safety: DW_AT_const_value of enum whose underlying type is an unsigned
                 // integer must contain unsigned data.
-                .unwrap()
-                as i128,
+                .unwrap() as i128,
             _ => unreachable!("C enums must have integer types!"),
         };
 
@@ -474,18 +472,21 @@ fn parse_enumeration_storage<R: Reader>(
     unit: &Unit<R>,
     entry: &DebuggingInformationEntry<R>,
 ) -> Result<Type> {
-    if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type) {
-        parse_ctx!(
-            parse_type(dwarf, unit, unit_offset),
-            "enum type type",
-            dwarf,
-            unit,
-            entry
-        )
-    } else {
-        // If the entry doesn't have a type attribute, try parsing it's encoding and size
-        // attributes, like a base type.
-        parse_ctx!(parse_base(entry), "enum base type", dwarf, unit, entry)
+    match entry.attr_value(gimli::DW_AT_type) {
+        Some(AttributeValue::UnitRef(unit_offset)) => {
+            parse_ctx!(
+                parse_type(dwarf, unit, unit_offset),
+                "enum type type",
+                dwarf,
+                unit,
+                entry
+            )
+        }
+        _ => {
+            // If the entry doesn't have a type attribute, try parsing it's encoding and size
+            // attributes, like a base type.
+            parse_ctx!(parse_base(entry), "enum base type", dwarf, unit, entry)
+        }
     }
 }
 
@@ -537,18 +538,17 @@ fn parse_structure<R: Reader>(
             let name = name.to_string()?;
 
             // Get the type of the member.
-            let ty = if let AttributeValue::UnitRef(unit_offset) =
-                get_attribute(member_entry, gimli::DW_AT_type)?
-            {
-                parse_ctx!(
+            let ty = match get_attribute(member_entry, gimli::DW_AT_type)? {
+                AttributeValue::UnitRef(unit_offset) => parse_ctx!(
                     parse_type(dwarf, unit, unit_offset),
                     "structure member",
                     dwarf,
                     unit,
                     &member_entry
-                )?
-            } else {
-                return Err(Error::BadAttribute.into());
+                )?,
+                _ => {
+                    return Err(Error::BadAttribute.into());
+                }
             };
 
             members.push(StructureMember {
@@ -610,26 +610,27 @@ fn parse_array<R: Reader>(
 ) -> Result<Type> {
     // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
     let array_entry = entries.current().unwrap();
-    let ty = if let Some(AttributeValue::UnitRef(unit_offset)) =
-        array_entry.attr_value(gimli::DW_AT_type)
-    {
-        parse_ctx!(
-            parse_type(dwarf, unit, unit_offset),
-            "array type",
-            dwarf,
-            unit,
-            array_entry
-        )
-    } else {
-        // If the entry doesn't have a type attribute, try parsing its encoding and size
-        // attributes, like a base type.
-        parse_ctx!(
-            parse_base(array_entry),
-            "array base type",
-            dwarf,
-            unit,
-            array_entry
-        )
+    let ty = match array_entry.attr_value(gimli::DW_AT_type) {
+        Some(AttributeValue::UnitRef(unit_offset)) => {
+            parse_ctx!(
+                parse_type(dwarf, unit, unit_offset),
+                "array type",
+                dwarf,
+                unit,
+                array_entry
+            )
+        }
+        _ => {
+            // If the entry doesn't have a type attribute, try parsing its encoding and size
+            // attributes, like a base type.
+            parse_ctx!(
+                parse_base(array_entry),
+                "array base type",
+                dwarf,
+                unit,
+                array_entry
+            )
+        }
     }?;
 
     let curr_depth = entries.depth();
@@ -685,25 +686,24 @@ fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<R>) -> Result<Type> {
     let byte_size = get_attribute(entry, gimli::DW_AT_byte_size)?;
     let encoding = get_attribute(entry, gimli::DW_AT_encoding)?;
 
-    if let (AttributeValue::Udata(byte_size), AttributeValue::Encoding(encoding)) =
-        (byte_size, encoding)
-    {
-        match (byte_size, encoding) {
-            (1, gimli::DW_ATE_boolean) => Ok(Type::Bool),
-            (1, gimli::DW_ATE_unsigned | gimli::DW_ATE_unsigned_char) => Ok(Type::U8),
-            (2, gimli::DW_ATE_unsigned) => Ok(Type::U16),
-            (4, gimli::DW_ATE_unsigned) => Ok(Type::U32),
-            (8, gimli::DW_ATE_unsigned) => Ok(Type::U64),
-            (1, gimli::DW_ATE_signed | gimli::DW_ATE_signed_char) => Ok(Type::I8),
-            (2, gimli::DW_ATE_signed) => Ok(Type::I16),
-            (4, gimli::DW_ATE_signed) => Ok(Type::I32),
-            (8, gimli::DW_ATE_signed) => Ok(Type::I64),
-            (4, gimli::DW_ATE_float) => Ok(Type::F32),
-            (8, gimli::DW_ATE_float) => Ok(Type::F64),
-            _ => Err(Error::UnsupportedBaseType(encoding, byte_size).into()),
+    match (byte_size, encoding) {
+        (AttributeValue::Udata(byte_size), AttributeValue::Encoding(encoding)) => {
+            match (byte_size, encoding) {
+                (1, gimli::DW_ATE_boolean) => Ok(Type::Bool),
+                (1, gimli::DW_ATE_unsigned | gimli::DW_ATE_unsigned_char) => Ok(Type::U8),
+                (2, gimli::DW_ATE_unsigned) => Ok(Type::U16),
+                (4, gimli::DW_ATE_unsigned) => Ok(Type::U32),
+                (8, gimli::DW_ATE_unsigned) => Ok(Type::U64),
+                (1, gimli::DW_ATE_signed | gimli::DW_ATE_signed_char) => Ok(Type::I8),
+                (2, gimli::DW_ATE_signed) => Ok(Type::I16),
+                (4, gimli::DW_ATE_signed) => Ok(Type::I32),
+                (8, gimli::DW_ATE_signed) => Ok(Type::I64),
+                (4, gimli::DW_ATE_float) => Ok(Type::F32),
+                (8, gimli::DW_ATE_float) => Ok(Type::F64),
+                _ => Err(Error::UnsupportedBaseType(encoding, byte_size).into()),
+            }
         }
-    } else {
-        Err(Error::BadAttribute.into())
+        _ => Err(Error::BadAttribute.into()),
     }
 }
 
