@@ -25,11 +25,11 @@ macro_rules! parse_ctx {
 }
 
 fn get_attribute<R: Reader>(
-    entry: &DebuggingInformationEntry<'_, '_, R>,
+    entry: &DebuggingInformationEntry<R>,
     attribute: gimli::DwAt,
 ) -> Result<AttributeValue<R, R::Offset>> {
     entry
-        .attr_value(attribute)?
+        .attr_value(attribute)
         .ok_or(Error::NoAttribute(attribute).into())
 }
 
@@ -43,7 +43,7 @@ impl SourceLocation {
     pub fn extract<R: Reader>(
         dwarf: &gimli::Dwarf<R>,
         unit: &Unit<R>,
-        entry: &DebuggingInformationEntry<'_, '_, R>,
+        entry: &DebuggingInformationEntry<R>,
     ) -> Option<Self> {
         // Get the file attribute value (should be a file index)
         let file_attr = get_attribute(entry, gimli::DW_AT_decl_file).ok()?;
@@ -63,15 +63,9 @@ impl SourceLocation {
         let file_name = dwarf.attr_string(unit, file_entry.path_name()).ok()?;
         let file_name = file_name.to_string().ok()?;
 
-        let line = entry
-            .attr_value(gimli::DW_AT_decl_line)
-            .ok()??
-            .udata_value()?;
+        let line = entry.attr_value(gimli::DW_AT_decl_line)?.udata_value()?;
 
-        let column = entry
-            .attr_value(gimli::DW_AT_decl_column)
-            .ok()??
-            .udata_value()?;
+        let column = entry.attr_value(gimli::DW_AT_decl_column)?.udata_value()?;
 
         Some(Self {
             file: file_name.to_string(),
@@ -95,7 +89,7 @@ pub trait ContextLocationExt<T> {
         item: &str,
         dwarf: &gimli::Dwarf<R>,
         unit: &gimli::Unit<R>,
-        entry: &gimli::DebuggingInformationEntry<'_, '_, R>,
+        entry: &gimli::DebuggingInformationEntry<R>,
     ) -> AnyhowResult<T>
     where
         R: gimli::Reader;
@@ -107,7 +101,7 @@ impl<T> ContextLocationExt<T> for AnyhowResult<T> {
         item: &str,
         dwarf: &gimli::Dwarf<R>,
         unit: &gimli::Unit<R>,
-        entry: &gimli::DebuggingInformationEntry<'_, '_, R>,
+        entry: &gimli::DebuggingInformationEntry<R>,
     ) -> AnyhowResult<T>
     where
         R: gimli::Reader,
@@ -231,7 +225,7 @@ fn find_compilation_unit<R: Reader>(
         // Iterate over the Debugging Information Entries (DIEs) in the unit header, usually the
         // the first one is the compilation unit DIE.
         let mut entries = unit.entries();
-        while let Some((_, entry)) = entries.next_dfs()? {
+        while let Some(entry) = entries.next_dfs()? {
             if entry.tag() != gimli::DW_TAG_compile_unit {
                 continue;
             }
@@ -275,7 +269,7 @@ fn find_type_die<R: Reader>(
         match entry.tag() {
             // Check structure name, continue to next sibling if there's no match.
             gimli::DW_TAG_structure_type => {
-                if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name)? {
+                if let Some(name_attribute) = entry.attr_value(gimli::DW_AT_name) {
                     let name = dwarf.attr_string(compilation_unit, name_attribute)?;
                     let name = name.to_string()?;
 
@@ -315,7 +309,7 @@ fn parse_type<R: Reader>(
 ) -> Result<Type> {
     let mut entries = unit.entries_at_offset(start_offset)?;
 
-    if let Some((_, entry)) = entries.next_dfs()? {
+    if let Some(entry) = entries.next_dfs()? {
         let tag = entry.tag();
         let entry = entry.clone();
 
@@ -402,16 +396,26 @@ fn parse_type<R: Reader>(
 fn parse_enumeration<R: Reader>(
     dwarf: &gimli::Dwarf<R>,
     unit: &Unit<R>,
-    mut entries: EntriesCursor<'_, '_, R>,
+    mut entries: EntriesCursor<'_, R>,
 ) -> Result<Type> {
     // Figure out the type of the storage used by the enum.
     // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
     let enum_entry = entries.current().unwrap();
     let ty = parse_enumeration_storage(dwarf, unit, enum_entry)?;
+    let curr_depth = entries.depth();
+
     let mut valid_values = BTreeMap::default();
 
     // Step into member DIEs
-    if let Some((1, mut entry)) = entries.next_dfs()? {
+    if let Some(mut entry) = entries.next_dfs()? {
+        if entry.depth <= curr_depth {
+            // No member DIEs, return early.
+            return Ok(Type::Enumeration {
+                ty: Box::new(ty),
+                valid_values,
+            });
+        }
+
         // Iterate over all the siblings (DW_TAG_enumerator DIEs)
         loop {
             let name = get_attribute(entry, gimli::DW_AT_name)?;
@@ -420,15 +424,17 @@ fn parse_enumeration<R: Reader>(
 
             let value = match ty {
                 Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
-                    .attr_value(gimli::DW_AT_const_value)?
-                    .and_then(|o| o.sdata_value())
+                    .attr_value(gimli::DW_AT_const_value)
+                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
+                    .sdata_value()
                     // Unwrap safety: DW_AT_const_value of enum whose underlying type is a signed
                     // integer must contain signed data.
                     .unwrap()
                     as i128,
                 Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
-                    .attr_value(gimli::DW_AT_const_value)?
-                    .and_then(|o| o.udata_value())
+                    .attr_value(gimli::DW_AT_const_value)
+                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
+                    .udata_value()
                     // Unwrap safety: DW_AT_const_value of enum whose underlying type is an unsigned
                     // integer must contain unsigned data.
                     .unwrap()
@@ -461,14 +467,20 @@ fn parse_enumeration<R: Reader>(
 fn parse_enumeration_storage<R: Reader>(
     dwarf: &gimli::Dwarf<R>,
     unit: &Unit<R>,
-    entry: &DebuggingInformationEntry<'_, '_, R>,
+    entry: &DebuggingInformationEntry<R>,
 ) -> Result<Type> {
-    if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type)? {
-        parse_type(dwarf, unit, unit_offset)
+    if let Some(AttributeValue::UnitRef(unit_offset)) = entry.attr_value(gimli::DW_AT_type) {
+        parse_ctx!(
+            parse_type(dwarf, unit, unit_offset),
+            "enum type type",
+            dwarf,
+            unit,
+            entry
+        )
     } else {
         // If the entry doesn't have a type attribute, try parsing it's encoding and size
         // attributes, like a base type.
-        parse_ctx!(parse_base(entry), "base type", dwarf, unit, entry)
+        parse_ctx!(parse_base(entry), "enum base type", dwarf, unit, entry)
     }
 }
 
@@ -480,19 +492,25 @@ fn parse_enumeration_storage<R: Reader>(
 fn parse_structure<R: Reader>(
     dwarf: &gimli::Dwarf<R>,
     unit: &Unit<R>,
-    mut entries: EntriesCursor<'_, '_, R>,
+    mut entries: EntriesCursor<R>,
 ) -> Result<Type> {
-    let mut members = vec![];
-
     // Unwrap should be safe here.
     let struct_entry = entries.current().unwrap();
 
     // TODO: handle DW_AT_bit_size
     let size = get_attribute(struct_entry, gimli::DW_AT_byte_size)?;
     let size = size.udata_value().unwrap() as usize;
+    let curr_depth = entries.depth();
+
+    let mut members = vec![];
 
     // Step into member DIEs
-    if let Some((1, mut member_entry)) = entries.next_dfs()? {
+    if let Some(mut member_entry) = entries.next_dfs()? {
+        if member_entry.depth <= curr_depth {
+            // No member DIEs, return early.
+            return Ok(Type::Structure { members, size });
+        }
+
         // Iterate over all the siblings until there's no more.
         loop {
             // Skip non members.
@@ -519,8 +537,9 @@ fn parse_structure<R: Reader>(
 
                 // Get the members offset from the struct's beginning.
                 let offset = member_entry
-                    .attr_value(gimli::DW_AT_data_member_location)?
-                    .and_then(|o| o.udata_value())
+                    .attr_value(gimli::DW_AT_data_member_location)
+                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_data_member_location))?
+                    .udata_value()
                     .unwrap_or(0);
 
                 members.push(StructureMember { name, ty, offset });
@@ -538,9 +557,9 @@ fn parse_structure<R: Reader>(
     Ok(Type::Structure { members, size })
 }
 
-fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<u64> {
+fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<R>) -> Result<u64> {
     // If we have a count attribute - use it instead of lower/upped bounds.
-    if let Some(value) = entry.attr_value(gimli::DW_AT_count)? {
+    if let Some(value) = entry.attr_value(gimli::DW_AT_count) {
         if let Some(value) = value.udata_value() {
             return Ok(value);
         } else {
@@ -550,11 +569,11 @@ fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>
 
     // Lower bound is optional, defaults to 0 if not provided.
     let lower_bound = entry
-        .attr_value(gimli::DW_AT_lower_bound)?
+        .attr_value(gimli::DW_AT_lower_bound)
         .map_or(Ok(0), |v| v.udata_value().ok_or(Error::BadAttribute))?;
 
     let upper_bound = entry
-        .attr_value(gimli::DW_AT_upper_bound)?
+        .attr_value(gimli::DW_AT_upper_bound)
         .ok_or(Error::NoAttribute(gimli::DW_AT_upper_bound))?
         .udata_value()
         .ok_or(Error::BadAttribute)?;
@@ -576,12 +595,12 @@ fn parse_array_dimension<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>
 fn parse_array<R: Reader>(
     dwarf: &gimli::Dwarf<R>,
     unit: &Unit<R>,
-    mut entries: EntriesCursor<'_, '_, R>,
+    mut entries: EntriesCursor<'_, R>,
 ) -> Result<Type> {
     // Unwrap safety: this function is called by `parse_type`, so the current entry must exist.
     let array_entry = entries.current().unwrap();
     let ty = if let Some(AttributeValue::UnitRef(unit_offset)) =
-        array_entry.attr_value(gimli::DW_AT_type)?
+        array_entry.attr_value(gimli::DW_AT_type)
     {
         parse_ctx!(
             parse_type(dwarf, unit, unit_offset),
@@ -591,7 +610,7 @@ fn parse_array<R: Reader>(
             array_entry
         )
     } else {
-        // If the entry doesn't have a type attribute, try parsing it's encoding and size
+        // If the entry doesn't have a type attribute, try parsing its encoding and size
         // attributes, like a base type.
         parse_ctx!(
             parse_base(array_entry),
@@ -602,10 +621,19 @@ fn parse_array<R: Reader>(
         )
     }?;
 
+    let curr_depth = entries.depth();
     let mut lengths = vec![];
 
     // Step into member DIEs
-    if let Some((1, mut entry)) = entries.next_dfs()? {
+    if let Some(mut entry) = entries.next_dfs()? {
+        if entry.depth <= curr_depth {
+            // No member DIEs, return early.
+            return Ok(Type::Array {
+                ty: Box::new(ty),
+                lengths,
+            });
+        }
+
         // Iterate over all the siblings until there's no more.
         loop {
             lengths.push(parse_ctx!(
@@ -636,7 +664,7 @@ fn parse_array<R: Reader>(
 /// Output:
 /// * Returns `Ok` if the base type DIE is successfully parsed.
 /// * Returns `Err` if an error is encountered.
-fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
+fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<R>) -> Result<Type> {
     // TODO: use bit_size if byte_size not available?
     let byte_size = get_attribute(entry, gimli::DW_AT_byte_size)?;
     let encoding = get_attribute(entry, gimli::DW_AT_encoding)?;
@@ -668,7 +696,7 @@ fn parse_base<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result
 /// Output:
 /// * Returns `Ok` if the pointer type DIE is successfully parsed.
 /// * Returns `Err` if an error is encountered.
-fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<'_, '_, R>) -> Result<Type> {
+fn parse_pointer<R: Reader>(entry: &DebuggingInformationEntry<R>) -> Result<Type> {
     let byte_size = get_attribute(entry, gimli::DW_AT_byte_size)?;
 
     if let AttributeValue::Udata(byte_size) = byte_size {

@@ -16,9 +16,9 @@ anyhow = "1.0"
 cdefmt-decoder = { path = "decoder", version = "0.7.0" }
 cdefmt-parser = { path = "parser", version = "0.7.0" }
 clap = { version = "4.5", features = ["derive"] }
-gimli = "0.32"
-lazy-regex = "3.4"
+gimli = "0.33"
+lazy-regex = "3.6"
 memmap2 = "0.9"
-object = "0.37"
+object = "0.38"
 rformat = { git = "https://github.com/RisinT96/rformat.git", version = "0.2.0" }
 thiserror = "2.0"
