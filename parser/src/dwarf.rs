@@ -406,51 +406,56 @@ fn parse_enumeration<R: Reader>(
 
     let mut valid_values = BTreeMap::default();
 
-    // Step into member DIEs
-    if let Some(mut entry) = entries.next_dfs()? {
-        if entry.depth <= curr_depth {
-            // No member DIEs, return early.
-            return Ok(Type::Enumeration {
-                ty: Box::new(ty),
-                valid_values,
-            });
-        }
+    // Early return if no member DIEs exist
+    let Some(first_entry) = entries.next_dfs()? else {
+        return Ok(Type::Enumeration {
+            ty: Box::new(ty),
+            valid_values,
+        });
+    };
 
-        // Iterate over all the siblings (DW_TAG_enumerator DIEs)
-        loop {
-            let name = get_attribute(entry, gimli::DW_AT_name)?;
-            let name = dwarf.attr_string(unit, name)?;
-            let name = name.to_string()?;
+    // Early return if we didn't actually step into the enumeration
+    if first_entry.depth <= curr_depth {
+        return Ok(Type::Enumeration {
+            ty: Box::new(ty),
+            valid_values,
+        });
+    }
 
-            let value = match ty {
-                Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
-                    .attr_value(gimli::DW_AT_const_value)
-                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
-                    .sdata_value()
-                    // Unwrap safety: DW_AT_const_value of enum whose underlying type is a signed
-                    // integer must contain signed data.
-                    .unwrap()
-                    as i128,
-                Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
-                    .attr_value(gimli::DW_AT_const_value)
-                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
-                    .udata_value()
-                    // Unwrap safety: DW_AT_const_value of enum whose underlying type is an unsigned
-                    // integer must contain unsigned data.
-                    .unwrap()
-                    as i128,
-                _ => unreachable!("C enums must have integer types!"),
-            };
+    // Process all enumerator DIEs
+    let mut entry = first_entry;
+    loop {
+        let name = get_attribute(entry, gimli::DW_AT_name)?;
+        let name = dwarf.attr_string(unit, name)?;
+        let name = name.to_string()?;
 
-            valid_values.insert(value, name.to_string());
+        let value = match ty {
+            Type::I8 | Type::I16 | Type::I32 | Type::I64 => entry
+                .attr_value(gimli::DW_AT_const_value)
+                .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
+                .sdata_value()
+                // Unwrap safety: DW_AT_const_value of enum whose underlying type is a signed
+                // integer must contain signed data.
+                .unwrap()
+                as i128,
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 => entry
+                .attr_value(gimli::DW_AT_const_value)
+                .ok_or(crate::Error::NoAttribute(gimli::DW_AT_const_value))?
+                .udata_value()
+                // Unwrap safety: DW_AT_const_value of enum whose underlying type is an unsigned
+                // integer must contain unsigned data.
+                .unwrap()
+                as i128,
+            _ => unreachable!("C enums must have integer types!"),
+        };
 
-            entry = if let Some(e) = entries.next_sibling()? {
-                e
-            } else {
-                // Reached end of DW_TAG_enumerator DIEs
-                break;
-            };
-        }
+        valid_values.insert(value, name.to_string());
+
+        // Get next sibling or break iteration.
+        entry = match entries.next_sibling()? {
+            Some(e) => e,
+            None => break,
+        };
     }
 
     Ok(Type::Enumeration {
@@ -504,54 +509,60 @@ fn parse_structure<R: Reader>(
 
     let mut members = vec![];
 
-    // Step into member DIEs
-    if let Some(mut member_entry) = entries.next_dfs()? {
-        if member_entry.depth <= curr_depth {
-            // No member DIEs, return early.
-            return Ok(Type::Structure { members, size });
-        }
+    // Early return if no member DIEs exist
+    let Some(first_entry) = entries.next_dfs()? else {
+        return Ok(Type::Structure { members, size });
+    };
 
-        // Iterate over all the siblings until there's no more.
-        loop {
-            // Skip non members.
-            if member_entry.tag() == gimli::DW_TAG_member {
-                // Get the name of the member.
-                let name = get_attribute(member_entry, gimli::DW_AT_name)?;
-                let name = dwarf.attr_string(unit, name)?;
-                let name = name.to_string()?.to_string();
+    // Early return if we didn't actually step into the structure
+    if first_entry.depth <= curr_depth {
+        return Ok(Type::Structure { members, size });
+    }
 
-                // Get the type of the member.
-                let ty = if let AttributeValue::UnitRef(unit_offset) =
-                    get_attribute(member_entry, gimli::DW_AT_type)?
-                {
-                    parse_ctx!(
-                        parse_type(dwarf, unit, unit_offset),
-                        "structure member",
-                        dwarf,
-                        unit,
-                        &member_entry
-                    )?
-                } else {
-                    return Err(Error::BadAttribute.into());
-                };
+    // Process all member DIEs
+    let mut member_entry = first_entry;
+    loop {
+        // Process member tags
+        if member_entry.tag() == gimli::DW_TAG_member {
+            // Get the members offset from the struct's beginning.
+            let offset = member_entry
+                .attr_value(gimli::DW_AT_data_member_location)
+                .ok_or(crate::Error::NoAttribute(gimli::DW_AT_data_member_location))?
+                .udata_value()
+                .unwrap_or(0);
 
-                // Get the members offset from the struct's beginning.
-                let offset = member_entry
-                    .attr_value(gimli::DW_AT_data_member_location)
-                    .ok_or(crate::Error::NoAttribute(gimli::DW_AT_data_member_location))?
-                    .udata_value()
-                    .unwrap_or(0);
+            // Get the name of the member.
+            let name = get_attribute(member_entry, gimli::DW_AT_name)?;
+            let name = dwarf.attr_string(unit, name)?;
+            let name = name.to_string()?;
 
-                members.push(StructureMember { name, ty, offset });
-            }
-
-            // Get next sibling or break iteration.
-            member_entry = if let Some(e) = entries.next_sibling()? {
-                e
+            // Get the type of the member.
+            let ty = if let AttributeValue::UnitRef(unit_offset) =
+                get_attribute(member_entry, gimli::DW_AT_type)?
+            {
+                parse_ctx!(
+                    parse_type(dwarf, unit, unit_offset),
+                    "structure member",
+                    dwarf,
+                    unit,
+                    &member_entry
+                )?
             } else {
-                break;
+                return Err(Error::BadAttribute.into());
             };
+
+            members.push(StructureMember {
+                name: name.to_string(),
+                ty,
+                offset,
+            });
         }
+
+        // Get next sibling or break iteration.
+        member_entry = match entries.next_sibling()? {
+            Some(e) => e,
+            None => break,
+        };
     }
 
     Ok(Type::Structure { members, size })
@@ -624,33 +635,38 @@ fn parse_array<R: Reader>(
     let curr_depth = entries.depth();
     let mut lengths = vec![];
 
-    // Step into member DIEs
-    if let Some(mut entry) = entries.next_dfs()? {
-        if entry.depth <= curr_depth {
-            // No member DIEs, return early.
-            return Ok(Type::Array {
-                ty: Box::new(ty),
-                lengths,
-            });
-        }
+    // Early return if no dimension DIEs exist
+    let Some(first_entry) = entries.next_dfs()? else {
+        return Ok(Type::Array {
+            ty: Box::new(ty),
+            lengths,
+        });
+    };
 
-        // Iterate over all the siblings until there's no more.
-        loop {
-            lengths.push(parse_ctx!(
-                parse_array_dimension(entry),
-                &format!("array dimension {}", lengths.len()),
-                dwarf,
-                unit,
-                entry
-            )?);
+    // Early return if we didn't actually step into the array
+    if first_entry.depth <= curr_depth {
+        return Ok(Type::Array {
+            ty: Box::new(ty),
+            lengths,
+        });
+    }
 
-            // Get next sibling or break iteration.
-            entry = if let Some(e) = entries.next_sibling()? {
-                e
-            } else {
-                break;
-            };
-        }
+    // Process all dimension DIEs
+    let mut entry = first_entry;
+    loop {
+        lengths.push(parse_ctx!(
+            parse_array_dimension(entry),
+            &format!("array dimension {}", lengths.len()),
+            dwarf,
+            unit,
+            entry
+        )?);
+
+        // Get next sibling or break iteration.
+        entry = match entries.next_sibling()? {
+            Some(e) => e,
+            None => break,
+        };
     }
 
     Ok(Type::Array {
