@@ -3,6 +3,7 @@
 //! The logic contained within this file relates to using a log id to extract and parse the log's
 //! information from the elf.
 
+use anyhow::Context;
 use cdefmt_parser::metadata::{Level, Metadata};
 use rformat::{fmt::format::format_string, prelude::*};
 
@@ -48,6 +49,13 @@ impl Log<'_> {
             })
             .collect::<Vec<_>>();
 
-        Ok(format_string(self.metadata.fmt, &params)?)
+        format_string(self.metadata.fmt, &params).with_context(|| {
+            format!(
+                "{}:{}: Could not format '{}'",
+                self.get_file(),
+                self.get_line(),
+                self.metadata.fmt
+            )
+        })
     }
 }

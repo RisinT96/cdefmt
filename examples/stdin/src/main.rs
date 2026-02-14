@@ -51,15 +51,13 @@ fn main_impl() -> std::result::Result<(), anyhow::Error> {
         let current_buff = &mut buff[..len];
 
         stdin.read_exact(current_buff)?;
-        let log = decoder.decode_log(current_buff);
+        let log = decoder
+            .decode_log(current_buff)
+            .and_then(|l| l.to_string().map(|s| (s, l.get_level())));
 
         match log {
-            Ok(log) => println!(
-                "{:<7} > {}",
-                log.get_level(),
-                log.to_string().unwrap_or_else(|e| e.to_string())
-            ),
-            Err(e) => println!("Err: {:?}", e),
+            Ok((log, level)) => println!("{:<7} > {}", format!("{:?}", level), log),
+            Err(e) => println!("Error: {:?}", e),
         }
     }
 
