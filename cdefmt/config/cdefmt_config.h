@@ -46,4 +46,18 @@
 #define CDEFMT_DYNAMIC_LOG_BUFFER_FREE(buffer_)
 #endif /* defined (CDEFMT_USE_DYNAMIC_LOG_BUFFER) && CDEFMT_USE_DYNAMIC_LOG_BUFFER */
 
+/* =========================================== va_list ========================================== */
+
+/* Use a dynamically allocated log buffer, otherwise a buffer will be created on the stack on each
+ * invocation of CDEFMT_LOG.
+ * If enabled, a buffer will be allocated on the heap for each log, the following functions must be
+ * implemented by the user:
+ * - CDEFMT_DYNAMIC_LOG_BUFFER_ALLOC(size_)
+ * - CDEFMT_DYNAMIC_LOG_BUFFER_FREE()
+ */
+#define CDEFMT_USE_VA_LIST 0
+
+#if defined(CDEFMT_USE_VA_LIST) && CDEFMT_USE_VA_LIST
+#endif /* defined (CDEFMT_USE_VA_LIST) && CDEFMT_USE_VA_LIST */
+
 #endif /* CDEFMT_CONFIG_H */
