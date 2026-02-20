@@ -3,6 +3,14 @@ add_executable(example-stdout
     linkerscript.ld
 )
 
+set_target_properties(example-stdout
+    PROPERTIES
+        C_STANDARD 17
+        C_STANDARD_REQUIRED ON
+        LINKER_LANGUAGE C
+        LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linkerscript.ld
+)
+
 target_include_directories(example-stdout PRIVATE .)
 
 target_link_libraries(example-stdout
@@ -19,10 +27,4 @@ target_link_options(example-stdout
 target_compile_options(example-stdout
     PRIVATE
         -g
-)
-
-set_target_properties(example-stdout
-    PROPERTIES
-        LINK_DEPENDS
-            ${CMAKE_CURRENT_SOURCE_DIR}/linkerscript.ld
 )

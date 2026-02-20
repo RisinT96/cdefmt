@@ -46,6 +46,11 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
         "CDEFMT_BUILD_EXAMPLES" OFF
     )
 
+    cmake_dependent_option(
+        CDEFMT_BUILD_BENCH "build the benchmark targets" ON
+        "CDEFMT_BUILD_EXAMPLES" OFF
+    )
+
     if(CDEFMT_BUILD_EXAMPLE_STDOUT)
         add_subdirectory("examples/stdout")
         add_subdirectory("examples/stdout-cpp")
@@ -66,5 +71,9 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
             CRATES
                 stdin
         )
+    endif()
+
+    if(CDEFMT_BUILD_BENCH)
+        add_subdirectory("bench/generation")
     endif()
 endif()
